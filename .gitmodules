@@ -1,0 +1,3 @@
+[submodule "fsm"]
+	path = fsm
+	url = git@github.com:ArthurGoodman/fsm.git

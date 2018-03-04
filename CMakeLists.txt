@@ -14,8 +14,8 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib)
 ################################################################################
 
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED on)
-set(CMAKE_CXX_EXTENSIONS off)
+set(CMAKE_CXX_STANDARD_REQUIRED true)
+set(CMAKE_CXX_EXTENSIONS false)
 
 set(FLAGS "-Wall -Wextra -Wunused-variable -Wno-comment")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}")
@@ -24,15 +24,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}")
 # Libraries
 ################################################################################
 
-set(FSM_DIR ${PROJECT_SOURCE_DIR}/../fsm)
-add_library(fsm STATIC IMPORTED)
-set_target_properties(fsm PROPERTIES
-    IMPORTED_LOCATION ${FSM_DIR}/lib/libfsm.a
-    INTERFACE_INCLUDE_DIRECTORIES ${FSM_DIR}/include
-    )
-
 # Qt5
-set(CMAKE_AUTOMOC on)
 find_package(Qt5
     COMPONENTS
         Core
@@ -46,5 +38,8 @@ find_package(Qt5
 ################################################################################
 
 set(FSMVIZ ${PROJECT_NAME})
+
+set(FSM_BUILD_TEST false)
+add_subdirectory(fsm)
 
 add_subdirectory(src)

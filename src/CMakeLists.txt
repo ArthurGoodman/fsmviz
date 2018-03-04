@@ -5,6 +5,7 @@ file(GLOB_RECURSE SOURCES
 
 add_executable(${FSMVIZ} ${SOURCES})
 
+set(CMAKE_AUTOMOC true)
 qt5_use_modules(${FSMVIZ}
     Core
     Gui
