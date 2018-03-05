@@ -30,6 +30,7 @@ private: // fields
     QPointF m_translation;
     bool m_translating;
     bool m_moving;
+    bool m_run;
 };
 
 } // namespace fsmviz

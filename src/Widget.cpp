@@ -12,6 +12,7 @@ Widget::Widget()
     : m_selected_object{nullptr}
     , m_translating{false}
     , m_moving{false}
+    , m_run{false}
 {
     QSize screen_size = qApp->primaryScreen()->size();
     QPoint screen_center =
@@ -194,8 +195,77 @@ void Widget::keyPressEvent(QKeyEvent *e)
         m_translation = QPointF();
         break;
 
+    case Qt::Key_Space:
+        m_run = !m_run;
+        break;
+
     case Qt::Key_Delete:
         break;
+    }
+}
+
+void interact(
+    GraphicsObject *obj,
+    const QPointF &p,
+    ///@ add more arguments
+    bool moving,
+    bool attract,
+    bool edge,
+    bool special = false)
+{
+    static constexpr double edge_length = 150;
+    static constexpr double anti_gravity = 50;
+
+    if (obj->isSelected() && moving)
+    {
+        return;
+    }
+
+    QVector2D v(p - obj->getPos());
+    v.normalize();
+
+    double dx = obj->getPos().x() - p.x();
+    double dy = obj->getPos().y() - p.y();
+    double dist = std::sqrt(dx * dx + dy * dy);
+
+    double power;
+    if (special)
+    {
+        power = std::max(0.0, std::log(dist + 1));
+    }
+    else
+    {
+        if (edge)
+        {
+            power = std::abs(dist / edge_length - 1);
+        }
+        else
+        {
+            power = anti_gravity / (dist ? dist : 1);
+        }
+    }
+
+    QPointF force = (v * power).toPointF();
+
+    if (!attract)
+    {
+        force *= -1;
+    }
+
+    if (edge)
+    {
+        if (dist > edge_length)
+        {
+            obj->applyForce(force);
+        }
+        else
+        {
+            obj->applyForce(-force);
+        }
+    }
+    else
+    {
+        obj->applyForce(force);
     }
 }
 
@@ -210,41 +280,46 @@ void Widget::paintEvent(QPaintEvent *)
 
     ////////////////////////////////////////////////////////////////////////////
 
-    ///@ do this separately form drawing
+    ///@ do this separately from drawing
 
-    for (GraphicsObject *obj1 : m_objects)
+    if (m_run)
     {
-        TransitionGraphicsObject *tr = obj1->as<TransitionGraphicsObject>();
-
-        if (tr && tr->getEnd())
+        for (GraphicsObject *a : m_objects)
         {
-        }
+            TransitionGraphicsObject *tr = a->as<TransitionGraphicsObject>();
 
-        for (GraphicsObject *obj2 : m_objects)
-        {
-            if (obj1 == obj2)
+            if (tr && tr->getEnd())
             {
-                continue;
+                QPointF center =
+                    (tr->getStart()->getPos() + tr->getEnd()->getPos()) / 2;
+                interact(tr, center, m_moving, true, false, true);
+
+                interact(
+                    tr->getStart(),
+                    tr->getEnd()->getPos(),
+                    m_moving,
+                    true,
+                    true);
+                interact(
+                    tr->getEnd(),
+                    tr->getStart()->getPos(),
+                    m_moving,
+                    true,
+                    true);
             }
 
-            ///@ distance function
-            double dx = obj1->getPos().x() - obj2->getPos().x();
-            double dy = obj1->getPos().y() - obj2->getPos().y();
-            double dist = std::sqrt(dx * dx + dy * dy);
-
-            QVector2D v(obj2->getPos() - obj1->getPos());
-            v.normalize();
-
-            QPointF force = (v / dist / dist * 10).toPointF();
-
-            if (!m_moving || obj2 != m_selected_object)
+            for (GraphicsObject *b : m_objects)
             {
-                obj2->applyForce(force);
-            }
+                TransitionGraphicsObject *tr2 =
+                    b->as<TransitionGraphicsObject>();
 
-            if (!m_moving || obj1 != m_selected_object)
-            {
-                obj1->applyForce(-force);
+                if (a == b || tr || tr2)
+                {
+                    continue;
+                }
+
+                interact(a, b->getPos(), m_moving, false, false);
+                interact(b, a->getPos(), m_moving, false, false);
             }
         }
     }

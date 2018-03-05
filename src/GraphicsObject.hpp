@@ -19,6 +19,8 @@ public: // methods
     void select();
     void deselect();
 
+    bool isSelected() const;
+
     QPointF getPos() const;
     void setPos(const QPointF &pos);
 

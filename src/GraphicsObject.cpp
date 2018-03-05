@@ -40,6 +40,11 @@ void GraphicsObject::deselect()
     m_selected = false;
 }
 
+bool GraphicsObject::isSelected() const
+{
+    return m_selected;
+}
+
 QPointF GraphicsObject::getPos() const
 {
     return m_pos;
@@ -68,7 +73,7 @@ void GraphicsObject::applyForce(const QPointF &force)
 void GraphicsObject::tick()
 {
     m_pos += m_velocity;
-    m_velocity /= 1.05; ///@ magic constant
+    m_velocity /= 1.1; ///@ magic constant
 }
 
 } // namespace fsmviz
