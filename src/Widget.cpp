@@ -13,6 +13,7 @@ Widget::Widget()
     , m_translating{false}
     , m_moving{false}
     , m_run{false}
+    , m_scale{1}
 {
     QSize screen_size = qApp->primaryScreen()->size();
     QPoint screen_center =
@@ -159,6 +160,18 @@ void Widget::mouseMoveEvent(QMouseEvent *e)
     m_last_pos = e->pos();
 }
 
+void Widget::wheelEvent(QWheelEvent *e)
+{
+    if (e->delta() > 0)
+    {
+        m_scale *= 1.1;
+    }
+    else
+    {
+        m_scale /= 1.1;
+    }
+}
+
 void Widget::keyPressEvent(QKeyEvent *e)
 {
     switch (e->key())
@@ -193,6 +206,7 @@ void Widget::keyPressEvent(QKeyEvent *e)
 
     case Qt::Key_Backspace:
         m_translation = QPointF();
+        m_scale = 1;
         break;
 
     case Qt::Key_Space:
@@ -211,10 +225,10 @@ void interact(
     bool moving,
     bool attract,
     bool edge,
-    bool special = false)
+    bool special)
 {
-    static constexpr double edge_length = 150;
-    static constexpr double anti_gravity = 50;
+    static constexpr double edge_length = 100;
+    static constexpr double anti_gravity = 100;
 
     if (obj->isSelected() && moving)
     {
@@ -241,7 +255,7 @@ void interact(
         }
         else
         {
-            power = anti_gravity / (dist ? dist : 1);
+            power = anti_gravity / (dist > 0 ? dist : 1);
         }
     }
 
@@ -295,31 +309,20 @@ void Widget::paintEvent(QPaintEvent *)
                 interact(tr, center, m_moving, true, false, true);
 
                 interact(
-                    tr->getStart(),
-                    tr->getEnd()->getPos(),
-                    m_moving,
-                    true,
-                    true);
+                    tr->getStart(), tr->getPos(), m_moving, true, true, false);
                 interact(
-                    tr->getEnd(),
-                    tr->getStart()->getPos(),
-                    m_moving,
-                    true,
-                    true);
+                    tr->getEnd(), tr->getPos(), m_moving, true, true, false);
             }
 
             for (GraphicsObject *b : m_objects)
             {
-                TransitionGraphicsObject *tr2 =
-                    b->as<TransitionGraphicsObject>();
-
-                if (a == b || tr || tr2)
+                if (a >= b)
                 {
                     continue;
                 }
 
-                interact(a, b->getPos(), m_moving, false, false);
-                interact(b, a->getPos(), m_moving, false, false);
+                interact(a, b->getPos(), m_moving, false, false, false);
+                interact(b, a->getPos(), m_moving, false, false, false);
             }
         }
     }
