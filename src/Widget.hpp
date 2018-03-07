@@ -30,6 +30,7 @@ private: // fields
     bool m_translating;
     bool m_moving;
     bool m_run;
+    bool m_antialias;
 
     QPoint m_last_pos;
     QPointF m_translation;

@@ -24,7 +24,7 @@ void StateGraphicsObject::render(QPainter &p, int pass)
 
     static constexpr int c_delta_size = 4;
 
-    QPen pen(Qt::black, 1.5);
+    QPen pen(Qt::black, 2);
     p.setPen(pen);
 
     QPainterPath path;

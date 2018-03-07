@@ -13,6 +13,7 @@ Widget::Widget()
     , m_translating{false}
     , m_moving{false}
     , m_run{false}
+    , m_antialias{true}
     , m_scale{1}
 {
     QSize screen_size = qApp->primaryScreen()->size();
@@ -213,6 +214,10 @@ void Widget::keyPressEvent(QKeyEvent *e)
         m_run = !m_run;
         break;
 
+    case Qt::Key_A:
+        m_antialias = !m_antialias;
+        break;
+
     case Qt::Key_Delete:
         break;
     }
@@ -227,7 +232,7 @@ void interact(
     bool edge,
     bool special)
 {
-    static constexpr double edge_length = 100;
+    static constexpr double edge_length = 25;
     static constexpr double anti_gravity = 100;
 
     if (obj->isSelected() && moving)
@@ -290,7 +295,10 @@ void Widget::paintEvent(QPaintEvent *)
 
     p.translate(m_translation);
 
-    p.setRenderHint(QPainter::Antialiasing);
+    if (m_antialias)
+    {
+        p.setRenderHint(QPainter::Antialiasing);
+    }
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -304,14 +312,19 @@ void Widget::paintEvent(QPaintEvent *)
 
             if (tr && tr->getEnd())
             {
-                QPointF center =
-                    (tr->getStart()->getPos() + tr->getEnd()->getPos()) / 2;
-                interact(tr, center, m_moving, true, false, true);
+                // QPointF center =
+                //     (tr->getStart()->getPos() + tr->getEnd()->getPos()) / 2;
+                // interact(tr, center, m_moving, true, false, true);
 
                 interact(
                     tr->getStart(), tr->getPos(), m_moving, true, true, false);
                 interact(
                     tr->getEnd(), tr->getPos(), m_moving, true, true, false);
+
+                interact(
+                    tr, tr->getStart()->getPos(), m_moving, true, true, false);
+                interact(
+                    tr, tr->getEnd()->getPos(), m_moving, true, true, false);
             }
 
             for (GraphicsObject *b : m_objects)

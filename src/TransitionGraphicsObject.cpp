@@ -21,7 +21,7 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
     static const QColor c_default_color = QColor(100, 220, 100);
     static const QColor c_selected_color = QColor(255, 100, 100);
 
-    QPen pen(Qt::black, 1.5);
+    QPen pen(Qt::black, 2);
     p.setPen(pen);
 
     if (pass == 0)
@@ -36,30 +36,33 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
             QPointF center = (m_start->getPos() + m_end->getPos()) / 2;
             QPointF delta = (m_end->getPos() - center) / 2;
 
-            QPointF p1, p2;
-
             double x = m_pos.x();
-            double y = m_pos.x();
+            double y = m_pos.y();
 
             double end_x = m_end->getPos().x();
             double end_y = m_end->getPos().y();
 
+            QPointF p1, p2;
+
+            p1 = m_pos - delta;
+            p2 = m_pos + delta;
+
             if (m_start == m_end)
             {
-                ///@ fix this
-                p1 = QPointF(x + (end_y - y) / 4 * 3, y + (x - end_x) / 4 * 3);
-                p2 = QPointF(x + (y - end_y) / 4 * 3, y + (end_x - x) / 4 * 3);
+                QPointF center = (m_pos + m_end->getPos()) / 2;
+                QPointF v = center - m_pos;
+                double r = std::sqrt(v.x() * v.x() + v.y() * v.y());
+                path.addEllipse(center, r, r);
             }
             else
             {
-                p1 = m_pos - delta;
-                p2 = m_pos + delta;
+                path.quadTo(p1, m_pos);
+                path.quadTo(p2, m_end->getPos());
             }
 
-            path.quadTo(p1, m_pos);
-            path.quadTo(p2, m_end->getPos());
-
             p.strokePath(path, pen);
+
+            ///@ fix arrow location
 
             double bx, by;
             double q = 0.99;
