@@ -4,15 +4,13 @@ namespace fsmviz {
 
 GraphicsObject::GraphicsObject()
     : m_selected{false}
-    , m_size{}
     , m_pos{}
     , m_velocity{}
 {
 }
 
-GraphicsObject::GraphicsObject(const QPointF &pos)
+GraphicsObject::GraphicsObject(const QVector2D &pos)
     : m_selected{false}
-    , m_size{}
     , m_pos{pos}
     , m_velocity{}
 {
@@ -22,12 +20,9 @@ GraphicsObject::~GraphicsObject()
 {
 }
 
-bool GraphicsObject::contains(const QPointF &p) const
+bool GraphicsObject::contains(const QVector2D &p) const
 {
-    ///@ distance function
-    double dx = m_pos.x() - p.x();
-    double dy = m_pos.y() - p.y();
-    return std::sqrt(dx * dx + dy * dy) <= m_size;
+    return (m_pos - p).length() <= getSize();
 }
 
 void GraphicsObject::select()
@@ -45,35 +40,33 @@ bool GraphicsObject::isSelected() const
     return m_selected;
 }
 
-QPointF GraphicsObject::getPos() const
+QVector2D GraphicsObject::getPos() const
 {
     return m_pos;
 }
 
-void GraphicsObject::setPos(const QPointF &pos)
+void GraphicsObject::setPos(const QVector2D &pos)
 {
     m_pos = pos;
 }
 
-void GraphicsObject::move(const QPointF &delta)
+void GraphicsObject::move(const QVector2D &delta)
 {
     m_pos += delta;
 }
 
-double GraphicsObject::getSize() const
-{
-    return m_size;
-}
-
-void GraphicsObject::applyForce(const QPointF &force)
+void GraphicsObject::applyForce(const QVector2D &force)
 {
     m_velocity += force;
 }
 
-void GraphicsObject::tick()
+void GraphicsObject::tick(float dt)
 {
-    m_pos += m_velocity;
-    m_velocity /= 1.1; ///@ magic constant
+    static constexpr float c_damping = 1.1;
+    static constexpr float c_fps = 60;
+
+    m_pos += m_velocity * dt * c_fps;
+    m_velocity /= c_damping;
 }
 
 } // namespace fsmviz

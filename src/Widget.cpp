@@ -1,10 +1,9 @@
 #include "Widget.hpp"
+#include <chrono>
 #include <QtGui/QtGui>
 #include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
 #include "TransitionGraphicsObject.hpp"
-
-#include <iostream>
 
 namespace fsmviz {
 
@@ -34,6 +33,8 @@ Widget::~Widget()
 
 void Widget::timerEvent(QTimerEvent *)
 {
+    applyForces();
+    tick();
     repaint();
 }
 
@@ -50,7 +51,7 @@ void Widget::mousePressEvent(QMouseEvent *e)
         m_selected_object = nullptr;
     }
 
-    QPointF pos = e->pos() - m_translation;
+    QVector2D pos(e->pos() - m_translation);
 
     for (GraphicsObject *obj : m_objects)
     {
@@ -106,7 +107,7 @@ void Widget::mouseReleaseEvent(QMouseEvent *e)
 
     if (e->button() & Qt::RightButton && m_moving && transition)
     {
-        QPointF pos = e->pos() - m_translation;
+        QVector2D pos(e->pos() - m_translation);
 
         StateGraphicsObject *end = nullptr;
 
@@ -155,7 +156,7 @@ void Widget::mouseMoveEvent(QMouseEvent *e)
     }
     else if (m_moving)
     {
-        m_selected_object->move(delta);
+        m_selected_object->move(QVector2D(delta));
     }
 
     m_last_pos = e->pos();
@@ -223,75 +224,6 @@ void Widget::keyPressEvent(QKeyEvent *e)
     }
 }
 
-void interact(
-    GraphicsObject *obj,
-    const QPointF &p,
-    ///@ add more arguments
-    bool moving,
-    bool attract,
-    bool edge,
-    bool special)
-{
-    static constexpr double edge_length = 25;
-    static constexpr double anti_gravity = 100;
-
-    if (obj->isSelected() && moving)
-    {
-        return;
-    }
-
-    QVector2D v(p - obj->getPos());
-    v.normalize();
-
-    double dx = obj->getPos().x() - p.x();
-    double dy = obj->getPos().y() - p.y();
-    double dist = std::sqrt(dx * dx + dy * dy);
-
-    double power;
-    if (special)
-    {
-        power = std::max(0.0, std::log(dist + 1));
-    }
-    else
-    {
-        if (edge)
-        {
-            power = std::abs(dist / edge_length - 1);
-        }
-        else
-        {
-            power = anti_gravity / (dist > 0 ? dist : 1);
-        }
-    }
-
-    QPointF force = (v * power).toPointF();
-
-    if (!attract)
-    {
-        static constexpr double c_max_repulsion = 10;
-        power = std::min(power, c_max_repulsion);
-        force = (v * power).toPointF();
-
-        force *= -1;
-    }
-
-    if (edge)
-    {
-        if (dist > edge_length)
-        {
-            obj->applyForce(force);
-        }
-        else
-        {
-            obj->applyForce(-force);
-        }
-    }
-    else
-    {
-        obj->applyForce(force);
-    }
-}
-
 void Widget::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
@@ -304,60 +236,109 @@ void Widget::paintEvent(QPaintEvent *)
         p.setRenderHint(QPainter::Antialiasing);
     }
 
-    ////////////////////////////////////////////////////////////////////////////
-
-    ///@ do this separately from drawing
-
-    if (m_run)
-    {
-        for (GraphicsObject *a : m_objects)
-        {
-            TransitionGraphicsObject *tr = a->as<TransitionGraphicsObject>();
-
-            if (tr && tr->getEnd())
-            {
-                // QPointF center =
-                //     (tr->getStart()->getPos() + tr->getEnd()->getPos()) / 2;
-                // interact(tr, center, m_moving, true, false, true);
-
-                interact(
-                    tr->getStart(), tr->getPos(), m_moving, true, true, false);
-                interact(
-                    tr->getEnd(), tr->getPos(), m_moving, true, true, false);
-
-                interact(
-                    tr, tr->getStart()->getPos(), m_moving, true, true, false);
-                interact(
-                    tr, tr->getEnd()->getPos(), m_moving, true, true, false);
-            }
-
-            for (GraphicsObject *b : m_objects)
-            {
-                if (a >= b)
-                {
-                    continue;
-                }
-
-                interact(a, b->getPos(), m_moving, false, false, false);
-                interact(b, a->getPos(), m_moving, false, false, false);
-            }
-        }
-    }
-
-    for (GraphicsObject *obj : m_objects)
-    {
-        obj->tick();
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-
-    for (int pass = 0; pass < 3; pass++)
+    static constexpr int c_num_passes = 3;
+    for (int pass = 0; pass < c_num_passes; pass++)
     {
         for (GraphicsObject *obj : m_objects)
         {
             obj->render(p, pass);
         }
     }
+}
+
+void Widget::interact(GraphicsObject *a, GraphicsObject *b, bool attract)
+{
+    static constexpr float c_edge_length = 25;
+    const float anti_gravity = 100 * m_scale;
+
+    QVector2D v(a->getPos() - b->getPos());
+    float dist = v.length();
+    v.normalize();
+
+    float power;
+    if (attract)
+    {
+        power = std::abs(dist / c_edge_length - 1);
+    }
+    else
+    {
+        power = anti_gravity / (dist > 0 ? dist : 1);
+    }
+
+    QVector2D force;
+
+    if (attract)
+    {
+        force = v * power;
+
+        if (dist < c_edge_length)
+        {
+            force *= -1;
+        }
+    }
+    else
+    {
+        static constexpr float c_max_repulsion = 10;
+        force = -v * std::min(power, c_max_repulsion);
+    }
+
+    if (!a->isSelected() || !m_moving)
+    {
+        a->applyForce(-force);
+    }
+
+    if (!b->isSelected() || !m_moving)
+    {
+        b->applyForce(force);
+    }
+}
+
+void Widget::applyForces()
+{
+    if (!m_run)
+    {
+        return;
+    }
+
+    for (GraphicsObject *a : m_objects)
+    {
+        TransitionGraphicsObject *a_tr = a->as<TransitionGraphicsObject>();
+
+        if (a_tr && a_tr->getEnd())
+        {
+            interact(a_tr, a_tr->getStart(), true);
+            interact(a_tr, a_tr->getEnd(), true);
+        }
+
+        for (GraphicsObject *b : m_objects)
+        {
+            TransitionGraphicsObject *b_tr = b->as<TransitionGraphicsObject>();
+
+            if (a >= b || (a_tr && !a_tr->getEnd()) ||
+                (b_tr && !b_tr->getEnd()))
+            {
+                continue;
+            }
+
+            interact(b, a, false);
+        }
+    }
+}
+
+void Widget::tick()
+{
+    using Clock = std::chrono::steady_clock;
+    using TimePoint = Clock::time_point;
+    using Duration = std::chrono::duration<float>;
+
+    static TimePoint time;
+
+    for (GraphicsObject *obj : m_objects)
+    {
+        obj->tick(Duration(Clock::now() - time).count());
+    }
+
+    time = Clock::now();
 }
 
 } // namespace fsmviz

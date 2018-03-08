@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QtGui/QPainter>
+#include <QtGui/QtGui>
 
 namespace fsmviz {
 
@@ -8,38 +8,37 @@ class GraphicsObject
 {
 public: // methods
     GraphicsObject();
-    GraphicsObject(const QPointF &pos);
+    GraphicsObject(const QVector2D &pos);
 
     virtual ~GraphicsObject();
 
     virtual void render(QPainter &p, int pass) = 0;
 
-    virtual bool contains(const QPointF &p) const;
+    virtual double getSize() const = 0;
+
+    virtual bool contains(const QVector2D &p) const;
 
     void select();
     void deselect();
 
     bool isSelected() const;
 
-    QPointF getPos() const;
-    void setPos(const QPointF &pos);
+    QVector2D getPos() const;
+    void setPos(const QVector2D &pos);
 
-    void move(const QPointF &delta);
-
-    double getSize() const;
+    void move(const QVector2D &delta);
 
     template <class T>
     T *as();
 
-    void applyForce(const QPointF &force);
-    void tick(); ///@ take dt into account
+    void applyForce(const QVector2D &force);
+    void tick(float dt);
 
 protected: // fields
     bool m_selected;
-    double m_size;
 
-    QPointF m_pos;
-    QPointF m_velocity;
+    QVector2D m_pos;
+    QVector2D m_velocity;
 };
 
 template <class T>

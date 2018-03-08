@@ -23,6 +23,12 @@ protected: // methods
     void keyPressEvent(QKeyEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
 
+private: // methods
+    void interact(GraphicsObject *a, GraphicsObject *b, bool attract);
+
+    void applyForces();
+    void tick();
+
 private: // fields
     std::vector<GraphicsObject *> m_objects;
     GraphicsObject *m_selected_object;
@@ -34,7 +40,7 @@ private: // fields
 
     QPoint m_last_pos;
     QPointF m_translation;
-    double m_scale;
+    float m_scale;
 };
 
 } // namespace fsmviz
