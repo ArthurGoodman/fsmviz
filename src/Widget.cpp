@@ -268,6 +268,10 @@ void interact(
 
     if (!attract)
     {
+        static constexpr double c_max_repulsion = 10;
+        power = std::min(power, c_max_repulsion);
+        force = (v * power).toPointF();
+
         force *= -1;
     }
 

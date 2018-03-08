@@ -15,6 +15,24 @@ TransitionGraphicsObject::TransitionGraphicsObject(
     m_size = 10;
 }
 
+///@ refactor this
+void drawArrow(QPainter &p, const QVector2D &pos, QVector2D dir)
+{
+    static const float c_side = 10;
+    dir *= c_side;
+
+    QPainterPath path;
+
+    QVector2D n(dir.y(), -dir.x());
+
+    path.moveTo(pos.toPointF());
+    path.lineTo((pos + n / 1.5 - dir).toPointF());
+    path.lineTo((pos - n / 1.5 - dir).toPointF());
+    path.lineTo(pos.toPointF());
+
+    p.fillPath(path, Qt::black);
+}
+
 void TransitionGraphicsObject::render(QPainter &p, int pass)
 {
     ///@ organize colors
@@ -33,64 +51,76 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
             QPainterPath path;
             path.moveTo(m_start->getPos());
 
-            QPointF center = (m_start->getPos() + m_end->getPos()) / 2;
-            QPointF delta = (m_end->getPos() - center) / 2;
+            ///@ fix QVector2D
+            QVector2D center =
+                QVector2D(m_start->getPos() + m_end->getPos()) / 2;
+            QVector2D delta =
+                QVector2D(m_end->getPos() - center.toPointF()) / 2;
 
-            double x = m_pos.x();
-            double y = m_pos.y();
+            QVector2D p1, p2;
 
-            double end_x = m_end->getPos().x();
-            double end_y = m_end->getPos().y();
-
-            QPointF p1, p2;
-
-            p1 = m_pos - delta;
-            p2 = m_pos + delta;
+            ///@ fix QVector2D
+            p1 = QVector2D(m_pos) - delta;
+            p2 = QVector2D(m_pos) + delta;
 
             if (m_start == m_end)
             {
                 QPointF center = (m_pos + m_end->getPos()) / 2;
-                QPointF v = center - m_pos;
-                double r = std::sqrt(v.x() * v.x() + v.y() * v.y());
+                ///@ fix QVector2D
+                QVector2D v = QVector2D(center - m_pos);
+                float r = v.length();
                 path.addEllipse(center, r, r);
             }
             else
             {
-                path.quadTo(p1, m_pos);
-                path.quadTo(p2, m_end->getPos());
+                path.quadTo(p1.toPointF(), m_pos);
+                path.quadTo(p2.toPointF(), m_end->getPos());
             }
 
             p.strokePath(path, pen);
 
-            ///@ fix arrow location
+            if (m_start == m_end)
+            {
+                ///@ fix QVector2D
 
-            double bx, by;
-            double q = 0.99;
+                QPointF center = (m_pos + m_end->getPos()) / 2;
+                QVector2D v = QVector2D(m_pos - center);
 
-            bx = (1 - q) * (1 - q) * x + 2 * (1 - q) * q * p2.x() +
-                 q * q * end_x;
-            by = (1 - q) * (1 - q) * y + 2 * (1 - q) * q * p2.y() +
-                 q * q * end_y;
+                float r = v.length();
+                float R = m_end->getSize();
+                float d = QVector2D(m_end->getPos() - center).length();
+                float q = d * d - r * r + R * R;
+                float x = q / 2 / d;
+                float a = std::sqrt(4 * d * d * R * R - std::pow(q, 2)) / d;
 
-            double len =
-                std::sqrt(std::pow(end_x - bx, 2) + std::pow(end_y - by, 2));
+                float len = v.length();
 
-            bx = m_end->getSize() * (end_x - bx) / len;
-            by = m_end->getSize() * (end_y - by) / len;
+                v.normalize();
+                QVector2D dir = v * x + QVector2D(v.y(), -v.x()) * a / 2;
 
-            double cos = std::cos(M_PI / 15);
-            double sin = std::sin(M_PI / 15);
+                QTransform t;
+                t.rotate(35 * 25 / len); ///@ magic constant
+                QVector2D dir_t = QVector2D(t.map(dir.toPointF()));
 
-            path = QPainterPath();
-            path.moveTo(end_x - bx, end_y - by);
-            path.lineTo(
-                end_x - 1.5 * (bx * cos + by * -sin),
-                end_y - 1.5 * (bx * sin + by * cos));
-            path.lineTo(
-                end_x - 1.5 * (bx * cos + by * sin),
-                end_y - 1.5 * (bx * -sin + by * cos));
+                drawArrow(
+                    p,
+                    QVector2D(m_end->getPos() + dir.toPointF()),
+                    -dir_t.normalized());
+            }
+            else
+            {
+                ///@ fix QVector2D
+                QVector2D end(m_end->getPos());
+                QVector2D pos(m_pos);
 
-            p.fillPath(path, Qt::black);
+                QVector2D t;
+                float q = 0.9;
+                t = (1 - q) * (1 - q) * pos + 2 * (1 - q) * q * p2 +
+                    q * q * end;
+
+                QVector2D n = (end - t).normalized();
+                drawArrow(p, end - n * m_end->getSize(), n);
+            }
         }
         else
         {
