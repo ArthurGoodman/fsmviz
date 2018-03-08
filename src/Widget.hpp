@@ -24,14 +24,14 @@ protected: // methods
     void paintEvent(QPaintEvent *e) override;
 
 private: // methods
-    void interact(GraphicsObject *a, GraphicsObject *b, bool attract);
+    void interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract);
 
     void applyForces();
     void tick();
 
 private: // fields
-    std::vector<GraphicsObject *> m_objects;
-    GraphicsObject *m_selected_object;
+    std::vector<GraphicsObjectPtr> m_objects;
+    GraphicsObjectPtr m_selected_object;
 
     bool m_translating;
     bool m_moving;

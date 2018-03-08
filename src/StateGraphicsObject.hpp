@@ -21,4 +21,6 @@ private: // fields
     bool m_final;
 };
 
+using StateGraphicsObjectPtr = std::shared_ptr<StateGraphicsObject>;
+
 } // namespace fsmviz

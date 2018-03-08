@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <QtGui/QtGui>
 
 namespace fsmviz {
@@ -28,9 +29,6 @@ public: // methods
 
     void move(const QVector2D &delta);
 
-    template <class T>
-    T *as();
-
     void applyForce(const QVector2D &force);
     void tick(float dt);
 
@@ -41,10 +39,12 @@ protected: // fields
     QVector2D m_velocity;
 };
 
+using GraphicsObjectPtr = std::shared_ptr<GraphicsObject>;
+
 template <class T>
-T *GraphicsObject::as()
+std::shared_ptr<T> cast(GraphicsObjectPtr obj)
 {
-    return dynamic_cast<T *>(this);
+    return std::dynamic_pointer_cast<T>(obj);
 }
 
 } // namespace fsmviz

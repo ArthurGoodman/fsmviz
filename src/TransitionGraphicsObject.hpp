@@ -7,23 +7,27 @@ namespace fsmviz {
 class TransitionGraphicsObject : public GraphicsObject
 {
 public: // methods
-    TransitionGraphicsObject(StateGraphicsObject *start, const QVector2D &pos);
+    TransitionGraphicsObject(
+        StateGraphicsObjectPtr start,
+        const QVector2D &pos);
 
     void render(QPainter &p, int pass) override;
 
     double getSize() const override;
 
-    void setEnd(StateGraphicsObject *end);
+    void setEnd(StateGraphicsObjectPtr end);
 
-    StateGraphicsObject *getStart() const;
-    StateGraphicsObject *getEnd() const;
+    StateGraphicsObjectPtr getStart() const;
+    StateGraphicsObjectPtr getEnd() const;
 
 private: // methods
     void drawArrow(QPainter &p, const QVector2D &pos, QVector2D dir);
 
 private: // fields
-    StateGraphicsObject *m_start;
-    StateGraphicsObject *m_end;
+    StateGraphicsObjectPtr m_start;
+    StateGraphicsObjectPtr m_end;
 };
+
+using TransitionGraphicsObjectPtr = std::shared_ptr<TransitionGraphicsObject>;
 
 } // namespace fsmviz

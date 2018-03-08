@@ -5,7 +5,7 @@
 namespace fsmviz {
 
 TransitionGraphicsObject::TransitionGraphicsObject(
-    StateGraphicsObject *start,
+    StateGraphicsObjectPtr start,
     const QVector2D &pos)
     : GraphicsObject{pos}
     , m_start{start}
@@ -104,18 +104,18 @@ double TransitionGraphicsObject::getSize() const
     return 10;
 }
 
-void TransitionGraphicsObject::setEnd(StateGraphicsObject *end)
+void TransitionGraphicsObject::setEnd(StateGraphicsObjectPtr end)
 {
     m_end = end;
     m_pos = (m_start->getPos() + m_end->getPos()) / 2;
 }
 
-StateGraphicsObject *TransitionGraphicsObject::getStart() const
+StateGraphicsObjectPtr TransitionGraphicsObject::getStart() const
 {
     return m_start;
 }
 
-StateGraphicsObject *TransitionGraphicsObject::getEnd() const
+StateGraphicsObjectPtr TransitionGraphicsObject::getEnd() const
 {
     return m_end;
 }

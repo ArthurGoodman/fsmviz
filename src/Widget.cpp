@@ -53,7 +53,7 @@ void Widget::mousePressEvent(QMouseEvent *e)
 
     QVector2D pos(e->pos() - m_translation);
 
-    for (GraphicsObject *obj : m_objects)
+    for (GraphicsObjectPtr obj : m_objects)
     {
         if (obj->contains(pos))
         {
@@ -76,14 +76,14 @@ void Widget::mousePressEvent(QMouseEvent *e)
     }
     else if (
         e->button() & Qt::RightButton &&
-        !m_selected_object->as<TransitionGraphicsObject>())
+        !cast<TransitionGraphicsObject>(m_selected_object))
     {
-        StateGraphicsObject *state =
-            m_selected_object->as<StateGraphicsObject>();
+        StateGraphicsObjectPtr state =
+            cast<StateGraphicsObject>(m_selected_object);
         if (state)
         {
             m_selected_object->deselect();
-            m_selected_object = new TransitionGraphicsObject(state, pos);
+            m_selected_object.reset(new TransitionGraphicsObject(state, pos));
             m_selected_object->select();
             m_objects.emplace_back(m_selected_object);
 
@@ -91,7 +91,7 @@ void Widget::mousePressEvent(QMouseEvent *e)
         }
         else
         {
-            m_selected_object = new StateGraphicsObject(pos);
+            m_selected_object.reset(new StateGraphicsObject(pos));
             m_selected_object->select();
             m_objects.emplace_back(m_selected_object);
         }
@@ -102,18 +102,18 @@ void Widget::mousePressEvent(QMouseEvent *e)
 
 void Widget::mouseReleaseEvent(QMouseEvent *e)
 {
-    TransitionGraphicsObject *transition =
-        m_selected_object->as<TransitionGraphicsObject>();
+    TransitionGraphicsObjectPtr transition =
+        cast<TransitionGraphicsObject>(m_selected_object);
 
     if (e->button() & Qt::RightButton && m_moving && transition)
     {
         QVector2D pos(e->pos() - m_translation);
 
-        StateGraphicsObject *end = nullptr;
+        StateGraphicsObjectPtr end = nullptr;
 
-        for (GraphicsObject *obj : m_objects)
+        for (GraphicsObjectPtr obj : m_objects)
         {
-            StateGraphicsObject *state = obj->as<StateGraphicsObject>();
+            StateGraphicsObjectPtr state = cast<StateGraphicsObject>(obj);
             if (state && state->contains(pos))
             {
                 end = state;
@@ -132,7 +132,7 @@ void Widget::mouseReleaseEvent(QMouseEvent *e)
 
         if (!end)
         {
-            end = new StateGraphicsObject(pos);
+            end.reset(new StateGraphicsObject(pos));
             transition->deselect();
             end->select();
             m_selected_object = end;
@@ -187,8 +187,8 @@ void Widget::keyPressEvent(QKeyEvent *e)
 
     case Qt::Key_BracketLeft:
     {
-        StateGraphicsObject *state =
-            m_selected_object->as<StateGraphicsObject>();
+        StateGraphicsObjectPtr state =
+            cast<StateGraphicsObject>(m_selected_object);
         if (state)
         {
             state->toggleStarting();
@@ -197,8 +197,8 @@ void Widget::keyPressEvent(QKeyEvent *e)
     }
     case Qt::Key_BracketRight:
     {
-        StateGraphicsObject *state =
-            m_selected_object->as<StateGraphicsObject>();
+        StateGraphicsObjectPtr state =
+            cast<StateGraphicsObject>(m_selected_object);
         if (state)
         {
             state->toggleFinal();
@@ -239,14 +239,14 @@ void Widget::paintEvent(QPaintEvent *)
     static constexpr int c_num_passes = 3;
     for (int pass = 0; pass < c_num_passes; pass++)
     {
-        for (GraphicsObject *obj : m_objects)
+        for (GraphicsObjectPtr obj : m_objects)
         {
             obj->render(p, pass);
         }
     }
 }
 
-void Widget::interact(GraphicsObject *a, GraphicsObject *b, bool attract)
+void Widget::interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract)
 {
     static constexpr float c_edge_length = 25;
     const float anti_gravity = 100 * m_scale;
@@ -300,9 +300,9 @@ void Widget::applyForces()
         return;
     }
 
-    for (GraphicsObject *a : m_objects)
+    for (GraphicsObjectPtr a : m_objects)
     {
-        TransitionGraphicsObject *a_tr = a->as<TransitionGraphicsObject>();
+        TransitionGraphicsObjectPtr a_tr = cast<TransitionGraphicsObject>(a);
 
         if (a_tr && a_tr->getEnd())
         {
@@ -310,9 +310,10 @@ void Widget::applyForces()
             interact(a_tr, a_tr->getEnd(), true);
         }
 
-        for (GraphicsObject *b : m_objects)
+        for (GraphicsObjectPtr b : m_objects)
         {
-            TransitionGraphicsObject *b_tr = b->as<TransitionGraphicsObject>();
+            TransitionGraphicsObjectPtr b_tr =
+                cast<TransitionGraphicsObject>(b);
 
             if (a >= b || (a_tr && !a_tr->getEnd()) ||
                 (b_tr && !b_tr->getEnd()))
@@ -333,7 +334,7 @@ void Widget::tick()
 
     static TimePoint time;
 
-    for (GraphicsObject *obj : m_objects)
+    for (GraphicsObjectPtr obj : m_objects)
     {
         obj->tick(Duration(Clock::now() - time).count());
     }
