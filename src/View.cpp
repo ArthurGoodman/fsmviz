@@ -455,35 +455,35 @@ void View::tick()
     m_time = Clock::now();
 }
 
-void visitState(StateGraphicsObjectPtr state, int tag)
-{
-    if (state->getFlag())
-    {
-        return;
-    }
-
-    state->setFlag(true);
-    state->setTag(tag);
-
-    auto transitions = state->getTransitions();
-
-    for (TransitionGraphicsObjectPtr transition : transitions)
-    {
-        transition->setTag(tag);
-
-        if (transition->getStart() != state)
-        {
-            visitState(transition->getStart(), tag);
-        }
-        else if (transition->getEnd())
-        {
-            visitState(transition->getEnd(), tag);
-        }
-    }
-}
-
 void View::updateConnectedComponents()
 {
+    std::function<void(StateGraphicsObjectPtr, int)> visitState =
+        [&](StateGraphicsObjectPtr state, int tag) {
+            if (state->getFlag())
+            {
+                return;
+            }
+
+            state->setFlag(true);
+            state->setTag(tag);
+
+            auto transitions = state->getTransitions();
+
+            for (TransitionGraphicsObjectPtr transition : transitions)
+            {
+                transition->setTag(tag);
+
+                if (transition->getStart() != state)
+                {
+                    visitState(transition->getStart(), tag);
+                }
+                else if (transition->getEnd())
+                {
+                    visitState(transition->getEnd(), tag);
+                }
+            }
+        };
+
     for (StateGraphicsObjectPtr state : m_states)
     {
         state->setFlag(false);
