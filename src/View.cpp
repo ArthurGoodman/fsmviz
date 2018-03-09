@@ -85,7 +85,7 @@ void View::mousePressEvent(QMouseEvent *e)
         {
             m_selected_object->deselect();
             m_selected_object.reset(new TransitionGraphicsObject(state, pos));
-            state->connect(m_selected_object);
+            state->connect(cast<TransitionGraphicsObject>(m_selected_object));
             m_selected_object->select();
             m_objects.emplace_back(m_selected_object);
 
@@ -235,14 +235,12 @@ void View::keyPressEvent(QKeyEvent *e)
                     std::end(m_objects),
                     m_selected_object));
 
-                std::vector<GraphicsObjectPtr> transitions =
-                    state->getTransitions();
+                auto transitions = state->getTransitions();
 
-                for (GraphicsObjectPtr obj : transitions)
+                for (TransitionGraphicsObjectPtr tr : transitions)
                 {
-                    TransitionGraphicsObjectPtr tr =
-                        cast<TransitionGraphicsObject>(obj);
                     tr->getStart()->disconnect(tr);
+
                     if (tr->getEnd() != tr->getStart())
                     {
                         tr->getEnd()->disconnect(tr);
@@ -269,8 +267,8 @@ void View::keyPressEvent(QKeyEvent *e)
                     cast<TransitionGraphicsObject>(m_selected_object);
                 if (transition && transition->getEnd())
                 {
-                    transition->getStart()->disconnect(m_selected_object);
-                    transition->getEnd()->disconnect(m_selected_object);
+                    transition->getStart()->disconnect(transition);
+                    transition->getEnd()->disconnect(transition);
 
                     m_objects.erase(std::remove(
                         std::begin(m_objects),

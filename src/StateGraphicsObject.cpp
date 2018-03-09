@@ -63,28 +63,19 @@ void StateGraphicsObject::toggleFinal()
     m_final = !m_final;
 }
 
-void StateGraphicsObject::connect(GraphicsObjectPtr transition)
+void StateGraphicsObject::connect(TransitionGraphicsObjectPtr transition)
 {
-    if (!cast<TransitionGraphicsObject>(transition))
-    {
-        return;
-    }
-
     m_transitions.emplace_back(transition);
 }
 
-void StateGraphicsObject::disconnect(GraphicsObjectPtr transition)
+void StateGraphicsObject::disconnect(TransitionGraphicsObjectPtr transition)
 {
-    if (!cast<TransitionGraphicsObject>(transition))
-    {
-        return;
-    }
-
     m_transitions.erase(std::remove(
         std::begin(m_transitions), std::end(m_transitions), transition));
 }
 
-std::vector<GraphicsObjectPtr> StateGraphicsObject::getTransitions() const
+std::vector<TransitionGraphicsObjectPtr> StateGraphicsObject::getTransitions()
+    const
 {
     return m_transitions;
 }

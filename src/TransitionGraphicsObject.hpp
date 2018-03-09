@@ -28,6 +28,4 @@ private: // fields
     StateGraphicsObjectPtr m_end;
 };
 
-using TransitionGraphicsObjectPtr = std::shared_ptr<TransitionGraphicsObject>;
-
 } // namespace fsmviz

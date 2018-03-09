@@ -41,6 +41,12 @@ protected: // fields
 
 using GraphicsObjectPtr = std::shared_ptr<GraphicsObject>;
 
+class StateGraphicsObject;
+class TransitionGraphicsObject;
+
+using StateGraphicsObjectPtr = std::shared_ptr<StateGraphicsObject>;
+using TransitionGraphicsObjectPtr = std::shared_ptr<TransitionGraphicsObject>;
+
 template <class T>
 std::shared_ptr<T> cast(GraphicsObjectPtr obj)
 {

@@ -17,17 +17,15 @@ public: // methods
     void toggleStarting();
     void toggleFinal();
 
-    void connect(GraphicsObjectPtr transition);
-    void disconnect(GraphicsObjectPtr transition);
-    std::vector<GraphicsObjectPtr> getTransitions() const;
+    void connect(TransitionGraphicsObjectPtr transition);
+    void disconnect(TransitionGraphicsObjectPtr transition);
+    std::vector<TransitionGraphicsObjectPtr> getTransitions() const;
 
 private: // fields
-    std::vector<GraphicsObjectPtr> m_transitions;
+    std::vector<TransitionGraphicsObjectPtr> m_transitions;
 
     bool m_staring;
     bool m_final;
 };
-
-using StateGraphicsObjectPtr = std::shared_ptr<StateGraphicsObject>;
 
 } // namespace fsmviz
