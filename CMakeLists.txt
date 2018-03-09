@@ -37,7 +37,6 @@ find_package(Qt5
 
 set(FSMVIZ ${PROJECT_NAME})
 
-set(FSM_BUILD_TEST false)
 add_subdirectory(fsm)
-
+add_subdirectory(qconsole)
 add_subdirectory(src)
