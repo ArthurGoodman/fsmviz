@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include "GraphicsObject.hpp"
 
 namespace fsmviz {
@@ -16,7 +17,13 @@ public: // methods
     void toggleStarting();
     void toggleFinal();
 
+    void connect(GraphicsObjectPtr transition);
+    void disconnect(GraphicsObjectPtr transition);
+    std::vector<GraphicsObjectPtr> getTransitions() const;
+
 private: // fields
+    std::vector<GraphicsObjectPtr> m_transitions;
+
     bool m_staring;
     bool m_final;
 };

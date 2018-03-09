@@ -1,4 +1,5 @@
 #include "View.hpp"
+#include <algorithm>
 #include <QtGui/QtGui>
 #include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
@@ -84,6 +85,7 @@ void View::mousePressEvent(QMouseEvent *e)
         {
             m_selected_object->deselect();
             m_selected_object.reset(new TransitionGraphicsObject(state, pos));
+            state->connect(m_selected_object);
             m_selected_object->select();
             m_objects.emplace_back(m_selected_object);
 
@@ -140,6 +142,7 @@ void View::mouseReleaseEvent(QMouseEvent *e)
         }
 
         transition->setEnd(end);
+        end->connect(transition);
     }
 
     m_translating = false;
@@ -209,6 +212,7 @@ void View::keyPressEvent(QKeyEvent *e)
     case Qt::Key_Backspace:
         m_translation = QPointF();
         m_scale = 1;
+        m_objects.clear();
         break;
 
     case Qt::Key_Space:
@@ -220,6 +224,63 @@ void View::keyPressEvent(QKeyEvent *e)
         break;
 
     case Qt::Key_Delete:
+        if (m_selected_object)
+        {
+            StateGraphicsObjectPtr state =
+                cast<StateGraphicsObject>(m_selected_object);
+            if (state)
+            {
+                m_objects.erase(std::remove(
+                    std::begin(m_objects),
+                    std::end(m_objects),
+                    m_selected_object));
+
+                std::vector<GraphicsObjectPtr> transitions =
+                    state->getTransitions();
+
+                for (GraphicsObjectPtr obj : transitions)
+                {
+                    TransitionGraphicsObjectPtr tr =
+                        cast<TransitionGraphicsObject>(obj);
+                    tr->getStart()->disconnect(tr);
+                    if (tr->getEnd() != tr->getStart())
+                    {
+                        tr->getEnd()->disconnect(tr);
+                    }
+                }
+
+                m_objects.erase(
+                    std::remove_if(
+                        std::begin(m_objects),
+                        std::end(m_objects),
+                        [&](GraphicsObjectPtr obj) {
+                            return std::find(
+                                       std::begin(transitions),
+                                       std::end(transitions),
+                                       obj) != transitions.end();
+                        }),
+                    std::end(m_objects));
+
+                m_selected_object = nullptr;
+            }
+            else
+            {
+                TransitionGraphicsObjectPtr transition =
+                    cast<TransitionGraphicsObject>(m_selected_object);
+                if (transition && transition->getEnd())
+                {
+                    transition->getStart()->disconnect(m_selected_object);
+                    transition->getEnd()->disconnect(m_selected_object);
+
+                    m_objects.erase(std::remove(
+                        std::begin(m_objects),
+                        std::end(m_objects),
+                        m_selected_object));
+
+                    m_selected_object = nullptr;
+                }
+            }
+        }
         break;
     }
 }

@@ -1,4 +1,5 @@
 #include "StateGraphicsObject.hpp"
+#include "TransitionGraphicsObject.hpp"
 
 namespace fsmviz {
 
@@ -60,6 +61,32 @@ void StateGraphicsObject::toggleStarting()
 void StateGraphicsObject::toggleFinal()
 {
     m_final = !m_final;
+}
+
+void StateGraphicsObject::connect(GraphicsObjectPtr transition)
+{
+    if (!cast<TransitionGraphicsObject>(transition))
+    {
+        return;
+    }
+
+    m_transitions.emplace_back(transition);
+}
+
+void StateGraphicsObject::disconnect(GraphicsObjectPtr transition)
+{
+    if (!cast<TransitionGraphicsObject>(transition))
+    {
+        return;
+    }
+
+    m_transitions.erase(std::remove(
+        std::begin(m_transitions), std::end(m_transitions), transition));
+}
+
+std::vector<GraphicsObjectPtr> StateGraphicsObject::getTransitions() const
+{
+    return m_transitions;
 }
 
 } // namespace fsmviz
