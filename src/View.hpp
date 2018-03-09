@@ -3,6 +3,7 @@
 #include <chrono>
 #include <QtWidgets/QWidget>
 #include "GraphicsObject.hpp"
+#include "qconsole/QConsole.hpp"
 
 namespace fsmviz {
 
@@ -17,6 +18,7 @@ public: // methods
 
 protected: // methods
     void timerEvent(QTimerEvent *e) override;
+    void resizeEvent(QResizeEvent *e) override;
     void mousePressEvent(QMouseEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
     void mouseMoveEvent(QMouseEvent *e) override;
@@ -37,6 +39,11 @@ private: // methods
 
     void updateConnectedComponents();
 
+    void toggleConsole();
+
+private slots:
+    void resizeConsole();
+
 private: // fields
     std::vector<GraphicsObjectPtr> m_objects;
     std::vector<StateGraphicsObjectPtr> m_states;
@@ -54,6 +61,9 @@ private: // fields
     float m_scale;
 
     TimePoint m_time;
+
+    qconsole::QConsole m_console;
+    bool m_console_visible;
 };
 
 } // namespace fsmviz

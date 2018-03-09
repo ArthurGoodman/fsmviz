@@ -5,6 +5,8 @@
 #include "StateGraphicsObject.hpp"
 #include "TransitionGraphicsObject.hpp"
 
+#include <iostream>
+
 namespace fsmviz {
 
 View::View()
@@ -15,6 +17,8 @@ View::View()
     , m_antialias{true}
     , m_scale{1}
     , m_time{Clock::now()}
+    , m_console{this}
+    , m_console_visible{false}
 {
     QSize screen_size = qApp->primaryScreen()->size();
     QPoint screen_center =
@@ -24,6 +28,19 @@ View::View()
     move(screen_center - rect().center());
 
     setMouseTracking(true);
+
+    m_console.setPrompt("$ ");
+
+    m_console.setStyleSheet("background-color: rgba(0, 0, 0, 128);");
+
+    QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    font.setPixelSize(16);
+    m_console.setFont(font);
+
+    m_console.setProcesor(
+        [](const std::string &command) { std::cout << command << std::endl; });
+
+    setFocus();
 
     startTimer(16);
 }
@@ -37,6 +54,11 @@ void View::timerEvent(QTimerEvent *)
     applyForces();
     tick();
     repaint();
+}
+
+void View::resizeEvent(QResizeEvent *)
+{
+    resizeConsole();
 }
 
 void View::mousePressEvent(QMouseEvent *e)
@@ -194,7 +216,13 @@ void View::keyPressEvent(QKeyEvent *e)
         isFullScreen() ? showNormal() : showFullScreen();
         break;
     case Qt::Key_Escape:
-        isFullScreen() ? showNormal() : qApp->quit();
+        m_console_visible ? toggleConsole()
+                          : isFullScreen() ? showNormal() : qApp->quit();
+        break;
+
+    case Qt::Key_AsciiTilde:
+    case Qt::Key_QuoteLeft:
+        toggleConsole();
         break;
 
     case Qt::Key_BracketLeft:
@@ -241,6 +269,7 @@ void View::keyPressEvent(QKeyEvent *e)
                 cast<StateGraphicsObject>(m_selected_object);
             if (state)
             {
+                ///@ boilerplate
                 m_objects.erase(std::remove(
                     std::begin(m_objects), std::end(m_objects), state));
                 m_states.erase(std::remove(
@@ -258,6 +287,7 @@ void View::keyPressEvent(QKeyEvent *e)
                     }
                 }
 
+                ///@ boilerplate
                 m_objects.erase(
                     std::remove_if(
                         std::begin(m_objects),
@@ -291,6 +321,7 @@ void View::keyPressEvent(QKeyEvent *e)
                     transition->getStart()->disconnect(transition);
                     transition->getEnd()->disconnect(transition);
 
+                    ///@ boilerplate
                     m_objects.erase(std::remove(
                         std::begin(m_objects),
                         std::end(m_objects),
@@ -464,6 +495,37 @@ void View::updateConnectedComponents()
     {
         visitState(state, tag++);
     }
+}
+
+void View::toggleConsole()
+{
+    QPropertyAnimation *animation =
+        new QPropertyAnimation(&m_console, "geometry");
+    connect(
+        animation, &QPropertyAnimation::finished, this, &View::resizeConsole);
+    animation->setEasingCurve(QEasingCurve::InOutSine);
+    animation->setDuration(200);
+    animation->setStartValue(m_console.rect());
+
+    if (m_console_visible)
+    {
+        animation->setEndValue(QRect(0, 0, width(), 0));
+        m_console.clearFocus();
+    }
+    else
+    {
+        animation->setEndValue(QRect(0, 0, width(), height() / 3));
+        m_console.setFocus();
+    }
+
+    animation->start();
+
+    m_console_visible = !m_console_visible;
+}
+
+void View::resizeConsole()
+{
+    m_console.resize(width(), m_console_visible ? height() / 3 : 0);
 }
 
 } // namespace fsmviz

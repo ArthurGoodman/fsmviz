@@ -1,10 +1,5 @@
-file(GLOB_RECURSE FSMVIZ_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
-    )
-
-file(GLOB_RECURSE FSMVIZ_HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
-    )
+file(GLOB_RECURSE FSMVIZ_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+file(GLOB_RECURSE FSMVIZ_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
 
 set(CMAKE_AUTOMOC true)
 set(CMAKE_INCLUDE_CURRENT_DIR true)
@@ -18,6 +13,7 @@ add_executable(${FSMVIZ}
 
 target_link_libraries(${FSMVIZ}
     fsm
+    qconsole
     Qt5::Widgets
     )
 
