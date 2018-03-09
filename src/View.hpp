@@ -1,18 +1,19 @@
 #pragma once
 
+#include <chrono>
 #include <QtWidgets/QWidget>
 #include "GraphicsObject.hpp"
 
 namespace fsmviz {
 
-class Widget : public QWidget
+class View : public QWidget
 {
     Q_OBJECT
 
 public: // methods
-    Widget();
+    View();
 
-    virtual ~Widget();
+    virtual ~View();
 
 protected: // methods
     void timerEvent(QTimerEvent *e) override;
@@ -22,6 +23,11 @@ protected: // methods
     void wheelEvent(QWheelEvent *e) override;
     void keyPressEvent(QKeyEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
+
+private: // types
+    using Clock = std::chrono::steady_clock;
+    using TimePoint = Clock::time_point;
+    using Duration = std::chrono::duration<float>;
 
 private: // methods
     void interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract);
@@ -41,6 +47,8 @@ private: // fields
     QPoint m_last_pos;
     QPointF m_translation;
     float m_scale;
+
+    TimePoint m_time;
 };
 
 } // namespace fsmviz

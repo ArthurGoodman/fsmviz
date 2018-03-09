@@ -1,11 +1,11 @@
 #include <QtWidgets/QApplication>
-#include "Widget.hpp"
+#include "View.hpp"
 
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
 
-    fsmviz::Widget w;
+    fsmviz::View w;
     w.show();
 
     return app.exec();

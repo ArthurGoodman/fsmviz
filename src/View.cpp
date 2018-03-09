@@ -1,5 +1,4 @@
-#include "Widget.hpp"
-#include <chrono>
+#include "View.hpp"
 #include <QtGui/QtGui>
 #include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
@@ -7,13 +6,14 @@
 
 namespace fsmviz {
 
-Widget::Widget()
+View::View()
     : m_selected_object{nullptr}
     , m_translating{false}
     , m_moving{false}
     , m_run{false}
     , m_antialias{true}
     , m_scale{1}
+    , m_time{Clock::now()}
 {
     QSize screen_size = qApp->primaryScreen()->size();
     QPoint screen_center =
@@ -27,18 +27,18 @@ Widget::Widget()
     startTimer(16);
 }
 
-Widget::~Widget()
+View::~View()
 {
 }
 
-void Widget::timerEvent(QTimerEvent *)
+void View::timerEvent(QTimerEvent *)
 {
     applyForces();
     tick();
     repaint();
 }
 
-void Widget::mousePressEvent(QMouseEvent *e)
+void View::mousePressEvent(QMouseEvent *e)
 {
     if (!(e->button() & Qt::LeftButton) && !(e->button() & Qt::RightButton))
     {
@@ -100,7 +100,7 @@ void Widget::mousePressEvent(QMouseEvent *e)
     m_last_pos = e->pos();
 }
 
-void Widget::mouseReleaseEvent(QMouseEvent *e)
+void View::mouseReleaseEvent(QMouseEvent *e)
 {
     TransitionGraphicsObjectPtr transition =
         cast<TransitionGraphicsObject>(m_selected_object);
@@ -146,7 +146,7 @@ void Widget::mouseReleaseEvent(QMouseEvent *e)
     m_moving = false;
 }
 
-void Widget::mouseMoveEvent(QMouseEvent *e)
+void View::mouseMoveEvent(QMouseEvent *e)
 {
     QPointF delta = e->pos() - m_last_pos;
 
@@ -162,7 +162,7 @@ void Widget::mouseMoveEvent(QMouseEvent *e)
     m_last_pos = e->pos();
 }
 
-void Widget::wheelEvent(QWheelEvent *e)
+void View::wheelEvent(QWheelEvent *e)
 {
     if (e->delta() > 0)
     {
@@ -174,7 +174,7 @@ void Widget::wheelEvent(QWheelEvent *e)
     }
 }
 
-void Widget::keyPressEvent(QKeyEvent *e)
+void View::keyPressEvent(QKeyEvent *e)
 {
     switch (e->key())
     {
@@ -224,7 +224,7 @@ void Widget::keyPressEvent(QKeyEvent *e)
     }
 }
 
-void Widget::paintEvent(QPaintEvent *)
+void View::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
     p.fillRect(rect(), Qt::lightGray);
@@ -246,7 +246,7 @@ void Widget::paintEvent(QPaintEvent *)
     }
 }
 
-void Widget::interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract)
+void View::interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract)
 {
     static constexpr float c_edge_length = 25;
     const float anti_gravity = 100 * m_scale;
@@ -293,7 +293,7 @@ void Widget::interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract)
     }
 }
 
-void Widget::applyForces()
+void View::applyForces()
 {
     if (!m_run)
     {
@@ -326,20 +326,14 @@ void Widget::applyForces()
     }
 }
 
-void Widget::tick()
+void View::tick()
 {
-    using Clock = std::chrono::steady_clock;
-    using TimePoint = Clock::time_point;
-    using Duration = std::chrono::duration<float>;
-
-    static TimePoint time;
-
     for (GraphicsObjectPtr obj : m_objects)
     {
-        obj->tick(Duration(Clock::now() - time).count());
+        obj->tick(Duration(Clock::now() - m_time).count());
     }
 
-    time = Clock::now();
+    m_time = Clock::now();
 }
 
 } // namespace fsmviz
