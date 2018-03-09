@@ -35,8 +35,13 @@ private: // methods
     void applyForces();
     void tick();
 
+    void updateConnectedComponents();
+
 private: // fields
     std::vector<GraphicsObjectPtr> m_objects;
+    std::vector<StateGraphicsObjectPtr> m_states;
+    std::vector<TransitionGraphicsObjectPtr> m_transitions;
+
     GraphicsObjectPtr m_selected_object;
 
     bool m_translating;

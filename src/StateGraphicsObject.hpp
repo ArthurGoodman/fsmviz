@@ -21,11 +21,16 @@ public: // methods
     void disconnect(TransitionGraphicsObjectPtr transition);
     std::vector<TransitionGraphicsObjectPtr> getTransitions() const;
 
+    bool getFlag() const;
+    void setFlag(bool flag);
+
 private: // fields
     std::vector<TransitionGraphicsObjectPtr> m_transitions;
 
     bool m_staring;
     bool m_final;
+
+    bool m_flag;
 };
 
 } // namespace fsmviz

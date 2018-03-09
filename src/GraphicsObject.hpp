@@ -32,11 +32,16 @@ public: // methods
     void applyForce(const QVector2D &force);
     void tick(float dt);
 
+    int getTag() const;
+    void setTag(int tag);
+
 protected: // fields
     bool m_selected;
 
     QVector2D m_pos;
     QVector2D m_velocity;
+
+    int m_tag;
 };
 
 using GraphicsObjectPtr = std::shared_ptr<GraphicsObject>;

@@ -84,18 +84,25 @@ void View::mousePressEvent(QMouseEvent *e)
         if (state)
         {
             m_selected_object->deselect();
-            m_selected_object.reset(new TransitionGraphicsObject(state, pos));
-            state->connect(cast<TransitionGraphicsObject>(m_selected_object));
+            TransitionGraphicsObjectPtr transition{
+                new TransitionGraphicsObject(state, pos)};
+            m_selected_object = transition;
+            state->connect(transition);
             m_selected_object->select();
-            m_objects.emplace_back(m_selected_object);
+            m_objects.emplace_back(transition);
+            m_transitions.emplace_back(transition);
+            updateConnectedComponents();
 
             m_moving = true;
         }
         else
         {
-            m_selected_object.reset(new StateGraphicsObject(pos));
+            StateGraphicsObjectPtr state{new StateGraphicsObject(pos)};
+            m_selected_object = state;
             m_selected_object->select();
-            m_objects.emplace_back(m_selected_object);
+            m_objects.emplace_back(state);
+            m_states.emplace_back(state);
+            updateConnectedComponents();
         }
     }
 
@@ -113,10 +120,9 @@ void View::mouseReleaseEvent(QMouseEvent *e)
 
         StateGraphicsObjectPtr end = nullptr;
 
-        for (GraphicsObjectPtr obj : m_objects)
+        for (StateGraphicsObjectPtr state : m_states)
         {
-            StateGraphicsObjectPtr state = cast<StateGraphicsObject>(obj);
-            if (state && state->contains(pos))
+            if (state->contains(pos))
             {
                 end = state;
                 break;
@@ -139,10 +145,13 @@ void View::mouseReleaseEvent(QMouseEvent *e)
             end->select();
             m_selected_object = end;
             m_objects.emplace_back(end);
+            m_states.emplace_back(end);
         }
 
         transition->setEnd(end);
         end->connect(transition);
+
+        updateConnectedComponents();
     }
 
     m_translating = false;
@@ -213,6 +222,8 @@ void View::keyPressEvent(QKeyEvent *e)
         m_translation = QPointF();
         m_scale = 1;
         m_objects.clear();
+        m_states.clear();
+        m_transitions.clear();
         break;
 
     case Qt::Key_Space:
@@ -231,9 +242,9 @@ void View::keyPressEvent(QKeyEvent *e)
             if (state)
             {
                 m_objects.erase(std::remove(
-                    std::begin(m_objects),
-                    std::end(m_objects),
-                    m_selected_object));
+                    std::begin(m_objects), std::end(m_objects), state));
+                m_states.erase(std::remove(
+                    std::begin(m_states), std::end(m_states), state));
 
                 auto transitions = state->getTransitions();
 
@@ -259,7 +270,17 @@ void View::keyPressEvent(QKeyEvent *e)
                         }),
                     std::end(m_objects));
 
-                m_selected_object = nullptr;
+                m_transitions.erase(
+                    std::remove_if(
+                        std::begin(m_transitions),
+                        std::end(m_transitions),
+                        [&](TransitionGraphicsObjectPtr obj) {
+                            return std::find(
+                                       std::begin(transitions),
+                                       std::end(transitions),
+                                       obj) != transitions.end();
+                        }),
+                    std::end(m_transitions));
             }
             else
             {
@@ -274,10 +295,15 @@ void View::keyPressEvent(QKeyEvent *e)
                         std::begin(m_objects),
                         std::end(m_objects),
                         m_selected_object));
-
-                    m_selected_object = nullptr;
+                    m_transitions.erase(std::remove(
+                        std::begin(m_transitions),
+                        std::end(m_transitions),
+                        transition));
                 }
             }
+
+            m_selected_object = nullptr;
+            updateConnectedComponents();
         }
         break;
     }
@@ -380,7 +406,10 @@ void View::applyForces()
                 continue;
             }
 
-            interact(b, a, false);
+            if (a->getTag() == b->getTag())
+            {
+                interact(b, a, false);
+            }
         }
     }
 }
@@ -393,6 +422,48 @@ void View::tick()
     }
 
     m_time = Clock::now();
+}
+
+void visitState(StateGraphicsObjectPtr state, int tag)
+{
+    if (state->getFlag())
+    {
+        return;
+    }
+
+    state->setFlag(true);
+    state->setTag(tag);
+
+    auto transitions = state->getTransitions();
+
+    for (TransitionGraphicsObjectPtr transition : transitions)
+    {
+        transition->setTag(tag);
+
+        if (transition->getStart() != state)
+        {
+            visitState(transition->getStart(), tag);
+        }
+        else if (transition->getEnd())
+        {
+            visitState(transition->getEnd(), tag);
+        }
+    }
+}
+
+void View::updateConnectedComponents()
+{
+    for (StateGraphicsObjectPtr state : m_states)
+    {
+        state->setFlag(false);
+    }
+
+    int tag = 0;
+
+    for (StateGraphicsObjectPtr state : m_states)
+    {
+        visitState(state, tag++);
+    }
 }
 
 } // namespace fsmviz

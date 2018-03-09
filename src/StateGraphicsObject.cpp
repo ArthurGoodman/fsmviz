@@ -80,4 +80,14 @@ std::vector<TransitionGraphicsObjectPtr> StateGraphicsObject::getTransitions()
     return m_transitions;
 }
 
+bool StateGraphicsObject::getFlag() const
+{
+    return m_flag;
+}
+
+void StateGraphicsObject::setFlag(bool flag)
+{
+    m_flag = flag;
+}
+
 } // namespace fsmviz

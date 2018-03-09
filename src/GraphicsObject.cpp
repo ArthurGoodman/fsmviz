@@ -69,4 +69,14 @@ void GraphicsObject::tick(float dt)
     m_velocity /= c_damping;
 }
 
+int GraphicsObject::getTag() const
+{
+    return m_tag;
+}
+
+void GraphicsObject::setTag(int tag)
+{
+    m_tag = tag;
+}
+
 } // namespace fsmviz
