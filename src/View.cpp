@@ -21,6 +21,7 @@ View::View()
     , m_time{Clock::now()}
     , m_console{this}
     , m_console_visible{false}
+    , m_shortcuts_enabled{true} ///@ refactor
 {
     QSize screen_size = qApp->primaryScreen()->size();
     QPoint screen_center =
@@ -55,9 +56,21 @@ View::View()
 
     ///@todo Move commands into separate methods
 
+    ///@ temporary workaround
+    static bool from_key = false;
+
     m_processor.registerErrorCallback([&](const std::string &message) {
-        ///@todo Fix error from bound commands
+        if (from_key)
+        {
+            m_console.insertBlock();
+        }
+
         m_console << "error: " << message << "\n";
+
+        if (from_key)
+        {
+            m_console.insertPrompt();
+        }
     });
 
     m_processor.registerCommand(
@@ -69,7 +82,11 @@ View::View()
         "bind",
         std::function<void(std::string, std::string)>(
             [&](std::string key, std::string command) {
-                bind(key, [this, command]() { m_processor.process(command); });
+                bind(key, [this, command]() {
+                    from_key = true;
+                    m_processor.process(command);
+                    from_key = false;
+                });
             }));
 
     m_processor.registerCommand(
@@ -201,10 +218,31 @@ View::View()
     m_processor.registerCommand(
         "stop", std::function<void()>([&]() { m_run = false; }));
 
+    m_processor.registerCommand("clear", std::function<void()>([&]() {
+                                    m_console.clear();
+                                    if (from_key)
+                                    {
+                                        m_console.insertPrompt();
+                                    }
+                                }));
+    m_processor.registerCommand("cls", std::function<void()>([&]() {
+                                    m_console.clear();
+                                    if (from_key)
+                                    {
+                                        m_console.insertPrompt();
+                                    }
+                                }));
+
     m_processor.registerCommand(
-        "clear", std::function<void()>([&]() { m_console.clear(); }));
-    m_processor.registerCommand(
-        "cls", std::function<void()>([&]() { m_console.clear(); }));
+        "edit", std::function<void()>([&]() {
+            TransitionGraphicsObjectPtr transition =
+                cast<TransitionGraphicsObject>(m_selected_object);
+            if (transition)
+            {
+                m_shortcuts_enabled = false;
+                transition->setSymbol(-1); ///@ refactor
+            }
+        }));
 
     ////////////////////////////////////////////////////////////////////////////
     // Key bindings
@@ -219,6 +257,7 @@ View::View()
     bind("]", [&]() { m_processor.process("set_final"); });
     bind("r", [&]() { m_processor.process("run"); });
     bind("s", [&]() { m_processor.process("stop"); });
+    bind("return", [&]() { m_processor.process("edit"); });
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -269,7 +308,23 @@ void View::bind(std::string str, const std::function<void()> &handler)
     action->setShortcut(key_sequence);
 
     QMetaObject::Connection connection =
-        QObject::connect(action, &QAction::triggered, handler);
+        QObject::connect(action, &QAction::triggered, [=]() {
+            if (m_shortcuts_enabled)
+            {
+                handler();
+            }
+            else
+            {
+                QCoreApplication::postEvent(
+                    this,
+                    new QKeyEvent(
+                        QEvent::KeyPress,
+                        action->shortcut()[0],
+                        Qt::NoModifier,
+                        action->shortcut().toString().toLower()));
+            }
+        });
+
     m_actions[key_sequence] = std::make_pair(action, connection);
 }
 
@@ -298,7 +353,7 @@ void View::mousePressEvent(QMouseEvent *e)
     {
         m_selected_object->deselect();
         m_selected_object = nullptr;
-    }
+    };
 
     QVector2D pos(e->pos() - m_translation);
 
@@ -441,11 +496,40 @@ void View::wheelEvent(QWheelEvent *e)
 
 void View::keyPressEvent(QKeyEvent *e)
 {
+    TransitionGraphicsObjectPtr transition =
+        cast<TransitionGraphicsObject>(m_selected_object);
+
+    if (!m_shortcuts_enabled)
+    {
+        if ((e->key() >= Qt::Key_A && e->key() <= Qt::Key_Z) ||
+            e->key() == Qt::Key_Space)
+        {
+            if (e->key() == Qt::Key_Space)
+            {
+                transition->setSymbol('\0');
+            }
+            else
+            {
+                transition->setSymbol(e->text().toUtf8().data()[0]);
+            }
+            m_shortcuts_enabled = true;
+            return;
+        }
+    }
+
     switch (e->key())
     {
     case Qt::Key_Escape:
-        m_console_visible ? toggleConsole()
-                          : isFullScreen() ? showNormal() : qApp->quit();
+        if (!m_shortcuts_enabled)
+        {
+            m_shortcuts_enabled = true;
+            transition->setSymbol('\0');
+        }
+        else
+        {
+            m_console_visible ? toggleConsole()
+                              : isFullScreen() ? showNormal() : qApp->quit();
+        }
         break;
 
     case Qt::Key_QuoteLeft:

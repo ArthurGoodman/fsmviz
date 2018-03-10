@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 #include "GraphicsObject.hpp"
 
@@ -31,6 +32,8 @@ private: // fields
     bool m_final;
 
     bool m_flag;
+
+    std::size_t m_id;
 };
 
 } // namespace fsmviz

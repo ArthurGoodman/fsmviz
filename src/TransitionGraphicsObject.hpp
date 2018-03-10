@@ -16,6 +16,7 @@ public: // methods
     double getSize() const override;
 
     void setEnd(StateGraphicsObjectPtr end);
+    void setSymbol(char symbol);
 
     StateGraphicsObjectPtr getStart() const;
     StateGraphicsObjectPtr getEnd() const;
@@ -26,6 +27,7 @@ private: // methods
 private: // fields
     StateGraphicsObjectPtr m_start;
     StateGraphicsObjectPtr m_end;
+    char m_symbol;
 };
 
 } // namespace fsmviz

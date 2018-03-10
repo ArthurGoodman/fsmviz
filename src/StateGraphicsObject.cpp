@@ -3,10 +3,13 @@
 
 namespace fsmviz {
 
+static std::size_t g_state_num = 0;
+
 StateGraphicsObject::StateGraphicsObject(const QVector2D &pos)
     : GraphicsObject{pos}
     , m_staring{false}
     , m_final{false}
+    , m_id{g_state_num++}
 {
 }
 
@@ -28,6 +31,20 @@ void StateGraphicsObject::render(QPainter &p, int pass)
 
     p.fillPath(path, m_selected ? c_selected_color : c_default_color);
     p.strokePath(path, pen);
+
+    ///@ tmp
+
+    p.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+
+    static constexpr int c_rect_size = 75;
+
+    QPoint center = QPoint(c_rect_size, c_rect_size) / 2;
+    QSize size(c_rect_size, c_rect_size);
+
+    p.drawText(
+        QRect(m_pos.toPoint() - center, size),
+        Qt::AlignCenter,
+        QString::number(m_id));
 
     static constexpr int c_delta_size = 4;
 

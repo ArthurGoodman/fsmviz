@@ -76,6 +76,8 @@ private: // fields
         m_actions;
 
     gcp::GenericCommandProcessor m_processor;
+
+    bool m_shortcuts_enabled;
 };
 
 } // namespace fsmviz

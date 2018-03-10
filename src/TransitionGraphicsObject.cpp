@@ -10,6 +10,7 @@ TransitionGraphicsObject::TransitionGraphicsObject(
     : GraphicsObject{pos}
     , m_start{start}
     , m_end{nullptr}
+    , m_symbol{'\0'}
 {
 }
 
@@ -17,6 +18,7 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
 {
     static const QColor c_default_color = QColor(100, 220, 100);
     static const QColor c_selected_color = QColor(255, 100, 100);
+    static const QColor c_edit_color = QColor(100, 100, 255);
 
     QPen pen(Qt::black, 2);
     p.setPen(pen);
@@ -94,8 +96,30 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
         QPainterPath path;
         path.addEllipse(m_pos.toPointF(), getSize(), getSize());
 
-        p.fillPath(path, m_selected ? c_selected_color : c_default_color);
+        QColor color = m_selected ? c_selected_color : c_default_color;
+
+        if (m_symbol < 0)
+        {
+            color = c_edit_color;
+        }
+
+        p.fillPath(path, color);
         p.strokePath(path, pen);
+
+        if (m_symbol > 0)
+        {
+            p.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+
+            static constexpr int c_rect_size = 15;
+
+            QPoint center = QPoint(c_rect_size, c_rect_size) / 2;
+            QSize size(c_rect_size, c_rect_size);
+
+            p.drawText(
+                QRect(m_pos.toPoint() - center, size),
+                Qt::AlignCenter,
+                QString(m_symbol));
+        }
     }
 }
 
@@ -108,6 +132,11 @@ void TransitionGraphicsObject::setEnd(StateGraphicsObjectPtr end)
 {
     m_end = end;
     m_pos = (m_start->getPos() + m_end->getPos()) / 2;
+}
+
+void TransitionGraphicsObject::setSymbol(char symbol)
+{
+    m_symbol = symbol;
 }
 
 StateGraphicsObjectPtr TransitionGraphicsObject::getStart() const
