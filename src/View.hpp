@@ -7,7 +7,7 @@
 #include <utility>
 #include <QtWidgets/QWidget>
 #include "GraphicsObject.hpp"
-#include "gcp/GeneralCommandProcessor.hpp"
+#include "gcp/GenericCommandProcessor.hpp"
 #include "qconsole/QConsole.hpp"
 
 namespace fsmviz {
@@ -75,7 +75,7 @@ private: // fields
     std::map<QKeySequence, std::pair<QAction *, QMetaObject::Connection>>
         m_actions;
 
-    gcp::GeneralCommandProcessor m_processor;
+    gcp::GenericCommandProcessor m_processor;
 };
 
 } // namespace fsmviz

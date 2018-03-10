@@ -45,7 +45,7 @@ View::View()
     m_console.setFont(font);
 
     m_console.setProcessor(std::bind(
-        &gcp::GeneralCommandProcessor::process,
+        &gcp::GenericCommandProcessor::process,
         &m_processor,
         std::placeholders::_1));
 
