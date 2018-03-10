@@ -106,7 +106,7 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
         p.fillPath(path, color);
         p.strokePath(path, pen);
 
-        if (m_symbol > 0 && m_end)
+        if (m_symbol >= '\0' && m_end)
         {
             p.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
 
@@ -115,13 +115,15 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
             QPoint center = QPoint(c_rect_size, c_rect_size) / 2;
             QSize size(c_rect_size, c_rect_size);
 
+            const char sym[] = {m_symbol, '\0'};
+
             p.drawText(
                 QRect(m_pos.toPoint() - center, size),
                 Qt::AlignCenter,
-                QString(m_symbol));
+                QString(m_symbol ? sym : "\u03b5"));
         }
     }
-}
+} // namespace fsmviz
 
 double TransitionGraphicsObject::getSize() const
 {

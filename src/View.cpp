@@ -197,7 +197,7 @@ View::View()
         "show_normal", std::function<void()>([&]() { showNormal(); }));
 
     m_processor.registerCommand(
-        "set_starting", std::function<void()>([&]() {
+        "toggle_starting", std::function<void()>([&]() {
             StateGraphicsObjectPtr state =
                 cast<StateGraphicsObject>(m_selected_object);
             if (state)
@@ -207,7 +207,7 @@ View::View()
         }));
 
     m_processor.registerCommand(
-        "set_final", std::function<void()>([&]() {
+        "toggle_final", std::function<void()>([&]() {
             StateGraphicsObjectPtr state =
                 cast<StateGraphicsObject>(m_selected_object);
             if (state)
@@ -259,7 +259,7 @@ View::View()
             {
                 m_default_symbol = DefaultSymbol::Random;
             }
-            else if (sym.size() == 1 && sym[0] >= 'a' && sym[0] <= 'z')
+            else if (sym.size() == 1 && std::isalnum(sym[0]))
             {
                 m_default_symbol = DefaultSymbol::Letter;
                 m_default_letter = sym[0];
@@ -279,10 +279,8 @@ View::View()
     bind("a", [&]() { m_processor.process("antialias"); });
     bind("delete", [&]() { m_processor.process("delete"); });
     bind("f11", [&]() { m_processor.process("toggle_fullscreen"); });
-    bind("[", [&]() { m_processor.process("set_starting"); });
-    bind("]", [&]() { m_processor.process("set_final"); });
-    bind("r", [&]() { m_processor.process("run"); });
-    bind("s", [&]() { m_processor.process("stop"); });
+    bind("[", [&]() { m_processor.process("toggle_starting"); });
+    bind("]", [&]() { m_processor.process("toggle_final"); });
     bind("return", [&]() { m_processor.process("edit"); });
 
     ////////////////////////////////////////////////////////////////////////////
@@ -484,9 +482,6 @@ void View::mouseReleaseEvent(QMouseEvent *e)
         if (!end)
         {
             end.reset(new StateGraphicsObject(pos));
-            transition->deselect();
-            end->select();
-            m_selected_object = end;
             m_objects.emplace_back(end);
             m_states.emplace_back(end);
         }
@@ -542,6 +537,7 @@ void View::keyPressEvent(QKeyEvent *e)
     if (!m_shortcuts_enabled)
     {
         if ((e->key() >= Qt::Key_A && e->key() <= Qt::Key_Z) ||
+            (e->key() >= Qt::Key_0 && e->key() <= Qt::Key_9) ||
             e->key() == Qt::Key_Space)
         {
             if (e->key() == Qt::Key_Space)
