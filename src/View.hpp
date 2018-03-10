@@ -3,9 +3,11 @@
 #include <chrono>
 #include <functional>
 #include <map>
+#include <string>
 #include <utility>
 #include <QtWidgets/QWidget>
 #include "GraphicsObject.hpp"
+#include "gcp/GeneralCommandProcessor.hpp"
 #include "qconsole/QConsole.hpp"
 
 namespace fsmviz {
@@ -72,6 +74,8 @@ private: // fields
 
     std::map<QKeySequence, std::pair<QAction *, QMetaObject::Connection>>
         m_actions;
+
+    gcp::GeneralCommandProcessor m_processor;
 };
 
 } // namespace fsmviz

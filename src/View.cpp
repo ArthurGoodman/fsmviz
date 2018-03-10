@@ -1,6 +1,7 @@
 #include "View.hpp"
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <sstream>
 #include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
@@ -29,6 +30,11 @@ View::View()
     move(screen_center - rect().center());
 
     setMouseTracking(true);
+    setFocus();
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Console setup
+    ////////////////////////////////////////////////////////////////////////////
 
     m_console.setPrompt("$ ");
 
@@ -38,24 +44,183 @@ View::View()
     font.setPixelSize(16);
     m_console.setFont(font);
 
-    m_console.setProcesor([&](const std::string &str) {
-        std::istringstream stream(str);
+    m_console.setProcessor(std::bind(
+        &gcp::GeneralCommandProcessor::process,
+        &m_processor,
+        std::placeholders::_1));
 
-        std::vector<std::string> words{
-            std::istream_iterator<std::string>(stream),
-            std::istream_iterator<std::string>()};
+    ////////////////////////////////////////////////////////////////////////////
+    // Processor commands
+    ////////////////////////////////////////////////////////////////////////////
 
-        if (words.size() < 2)
-        {
-            m_console << "Whoops...\n";
-        }
-        else
-        {
-            bind(words[0], [=]() { std::cout << words[1] << std::endl; });
-        }
+    ///@todo Move commands into separate methods
+
+    m_processor.registerErrorCallback([&](const std::string &message) {
+        ///@todo Fix error from bound commands
+        m_console << "error: " << message << "\n";
     });
 
-    setFocus();
+    m_processor.registerCommand(
+        "quit", std::function<void()>([&]() { close(); }));
+    m_processor.registerCommand(
+        "exit", std::function<void()>([&]() { close(); }));
+
+    m_processor.registerCommand(
+        "bind",
+        std::function<void(std::string, std::string)>(
+            [&](std::string key, std::string command) {
+                bind(key, [this, command]() { m_processor.process(command); });
+            }));
+
+    m_processor.registerCommand(
+        "toggle_run", std::function<void()>([&]() { m_run = !m_run; }));
+
+    m_processor.registerCommand("reset", std::function<void()>([&]() {
+                                    m_translation = QPointF();
+                                    m_scale = 1;
+                                    m_objects.clear();
+                                    m_states.clear();
+                                    m_transitions.clear();
+                                }));
+
+    m_processor.registerCommand("antialias", std::function<void()>([&]() {
+                                    m_antialias = !m_antialias;
+                                }));
+
+    m_processor.registerCommand(
+        "delete", std::function<void()>([&]() {
+            if (m_selected_object)
+            {
+                StateGraphicsObjectPtr state =
+                    cast<StateGraphicsObject>(m_selected_object);
+                if (state)
+                {
+                    ///@ boilerplate
+                    m_objects.erase(std::remove(
+                        std::begin(m_objects), std::end(m_objects), state));
+                    m_states.erase(std::remove(
+                        std::begin(m_states), std::end(m_states), state));
+
+                    auto transitions = state->getTransitions();
+
+                    for (TransitionGraphicsObjectPtr tr : transitions)
+                    {
+                        tr->getStart()->disconnect(tr);
+
+                        if (tr->getEnd() != tr->getStart())
+                        {
+                            tr->getEnd()->disconnect(tr);
+                        }
+                    }
+
+                    ///@ boilerplate
+                    m_objects.erase(
+                        std::remove_if(
+                            std::begin(m_objects),
+                            std::end(m_objects),
+                            [&](GraphicsObjectPtr obj) {
+                                return std::find(
+                                           std::begin(transitions),
+                                           std::end(transitions),
+                                           obj) != transitions.end();
+                            }),
+                        std::end(m_objects));
+
+                    m_transitions.erase(
+                        std::remove_if(
+                            std::begin(m_transitions),
+                            std::end(m_transitions),
+                            [&](TransitionGraphicsObjectPtr obj) {
+                                return std::find(
+                                           std::begin(transitions),
+                                           std::end(transitions),
+                                           obj) != transitions.end();
+                            }),
+                        std::end(m_transitions));
+                }
+                else
+                {
+                    TransitionGraphicsObjectPtr transition =
+                        cast<TransitionGraphicsObject>(m_selected_object);
+                    if (transition && transition->getEnd())
+                    {
+                        transition->getStart()->disconnect(transition);
+                        transition->getEnd()->disconnect(transition);
+
+                        ///@ boilerplate
+                        m_objects.erase(std::remove(
+                            std::begin(m_objects),
+                            std::end(m_objects),
+                            m_selected_object));
+                        m_transitions.erase(std::remove(
+                            std::begin(m_transitions),
+                            std::end(m_transitions),
+                            transition));
+                    }
+                }
+
+                m_selected_object = nullptr;
+                updateConnectedComponents();
+            }
+        }));
+
+    m_processor.registerCommand(
+        "toggle_fullscreen", std::function<void()>([&]() {
+            isFullScreen() ? showNormal() : showFullScreen();
+        }));
+
+    m_processor.registerCommand(
+        "show_fullscreen", std::function<void()>([&]() { showFullScreen(); }));
+
+    m_processor.registerCommand(
+        "show_normal", std::function<void()>([&]() { showNormal(); }));
+
+    m_processor.registerCommand(
+        "set_starting", std::function<void()>([&]() {
+            StateGraphicsObjectPtr state =
+                cast<StateGraphicsObject>(m_selected_object);
+            if (state)
+            {
+                state->toggleStarting();
+            }
+        }));
+
+    m_processor.registerCommand(
+        "set_final", std::function<void()>([&]() {
+            StateGraphicsObjectPtr state =
+                cast<StateGraphicsObject>(m_selected_object);
+            if (state)
+            {
+                state->toggleFinal();
+            }
+        }));
+
+    m_processor.registerCommand(
+        "run", std::function<void()>([&]() { m_run = true; }));
+
+    m_processor.registerCommand(
+        "stop", std::function<void()>([&]() { m_run = false; }));
+
+    m_processor.registerCommand(
+        "clear", std::function<void()>([&]() { m_console.clear(); }));
+    m_processor.registerCommand(
+        "cls", std::function<void()>([&]() { m_console.clear(); }));
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Key bindings
+    ////////////////////////////////////////////////////////////////////////////
+
+    bind("space", [&]() { m_processor.process("toggle_run"); });
+    bind("backspace", [&]() { m_processor.process("reset"); });
+    bind("a", [&]() { m_processor.process("antialias"); });
+    bind("delete", [&]() { m_processor.process("delete"); });
+    bind("f11", [&]() { m_processor.process("toggle_fullscreen"); });
+    bind("[", [&]() { m_processor.process("set_starting"); });
+    bind("]", [&]() { m_processor.process("set_final"); });
+    bind("r", [&]() { m_processor.process("run"); });
+    bind("s", [&]() { m_processor.process("stop"); });
+
+    ////////////////////////////////////////////////////////////////////////////
 
     startTimer(16);
 }
@@ -67,10 +232,10 @@ View::~View()
 void View::bind(std::string str, const std::function<void()> &handler)
 {
     static const std::vector<std::string> c_special_keys{
-        "esc",  "f1",     "f2",  "f3",        "f4",     "f5",    "f6",
-        "f7",   "f8",     "f9",  "f10",       "f11",    "f12",   "home",
-        "pgup", "pgdown", "end", "backspace", "delete", "up",    "left",
-        "down", "right",  "tab", "space",     "return", "enter", "pause"};
+        "f1",     "f2",  "f3",        "f4",     "f5",    "f6",   "f7",
+        "f8",     "f9",  "f10",       "f11",    "f12",   "home", "pgup",
+        "pgdown", "end", "backspace", "delete", "up",    "left", "down",
+        "right",  "tab", "space",     "return", "enter", "pause"};
 
     std::transform(std::begin(str), std::end(str), std::begin(str), ::tolower);
 
@@ -79,7 +244,7 @@ void View::bind(std::string str, const std::function<void()> &handler)
     if (((str.size() != 1 || !isprint(str[0])) &&
          std::find(std::begin(c_special_keys), std::end(c_special_keys), str) ==
              std::end(c_special_keys)) ||
-        key_sequence[0] == Qt::Key_unknown)
+        key_sequence[0] == Qt::Key_unknown || str[0] == '`')
     {
         m_console << "error: invalid key\n";
         return;
@@ -278,130 +443,13 @@ void View::keyPressEvent(QKeyEvent *e)
 {
     switch (e->key())
     {
-    case Qt::Key_F11:
-        isFullScreen() ? showNormal() : showFullScreen();
-        break;
     case Qt::Key_Escape:
         m_console_visible ? toggleConsole()
                           : isFullScreen() ? showNormal() : qApp->quit();
         break;
 
-    case Qt::Key_AsciiTilde:
     case Qt::Key_QuoteLeft:
         toggleConsole();
-        break;
-
-    case Qt::Key_BracketLeft:
-    {
-        StateGraphicsObjectPtr state =
-            cast<StateGraphicsObject>(m_selected_object);
-        if (state)
-        {
-            state->toggleStarting();
-        }
-        break;
-    }
-    case Qt::Key_BracketRight:
-    {
-        StateGraphicsObjectPtr state =
-            cast<StateGraphicsObject>(m_selected_object);
-        if (state)
-        {
-            state->toggleFinal();
-        }
-        break;
-    }
-
-    case Qt::Key_Backspace:
-        m_translation = QPointF();
-        m_scale = 1;
-        m_objects.clear();
-        m_states.clear();
-        m_transitions.clear();
-        break;
-
-    case Qt::Key_Space:
-        m_run = !m_run;
-        break;
-
-    case Qt::Key_A:
-        m_antialias = !m_antialias;
-        break;
-
-    case Qt::Key_Delete:
-        if (m_selected_object)
-        {
-            StateGraphicsObjectPtr state =
-                cast<StateGraphicsObject>(m_selected_object);
-            if (state)
-            {
-                ///@ boilerplate
-                m_objects.erase(std::remove(
-                    std::begin(m_objects), std::end(m_objects), state));
-                m_states.erase(std::remove(
-                    std::begin(m_states), std::end(m_states), state));
-
-                auto transitions = state->getTransitions();
-
-                for (TransitionGraphicsObjectPtr tr : transitions)
-                {
-                    tr->getStart()->disconnect(tr);
-
-                    if (tr->getEnd() != tr->getStart())
-                    {
-                        tr->getEnd()->disconnect(tr);
-                    }
-                }
-
-                ///@ boilerplate
-                m_objects.erase(
-                    std::remove_if(
-                        std::begin(m_objects),
-                        std::end(m_objects),
-                        [&](GraphicsObjectPtr obj) {
-                            return std::find(
-                                       std::begin(transitions),
-                                       std::end(transitions),
-                                       obj) != transitions.end();
-                        }),
-                    std::end(m_objects));
-
-                m_transitions.erase(
-                    std::remove_if(
-                        std::begin(m_transitions),
-                        std::end(m_transitions),
-                        [&](TransitionGraphicsObjectPtr obj) {
-                            return std::find(
-                                       std::begin(transitions),
-                                       std::end(transitions),
-                                       obj) != transitions.end();
-                        }),
-                    std::end(m_transitions));
-            }
-            else
-            {
-                TransitionGraphicsObjectPtr transition =
-                    cast<TransitionGraphicsObject>(m_selected_object);
-                if (transition && transition->getEnd())
-                {
-                    transition->getStart()->disconnect(transition);
-                    transition->getEnd()->disconnect(transition);
-
-                    ///@ boilerplate
-                    m_objects.erase(std::remove(
-                        std::begin(m_objects),
-                        std::end(m_objects),
-                        m_selected_object));
-                    m_transitions.erase(std::remove(
-                        std::begin(m_transitions),
-                        std::end(m_transitions),
-                        transition));
-                }
-            }
-
-            m_selected_object = nullptr;
-            updateConnectedComponents();
-        }
         break;
     }
 }
