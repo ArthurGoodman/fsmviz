@@ -22,6 +22,7 @@ public: // methods
     virtual ~View();
 
     void bind(std::string str, const std::function<void()> &handler);
+    void unbind(const std::string &str);
 
 protected: // methods
     void timerEvent(QTimerEvent *e) override;

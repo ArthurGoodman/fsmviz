@@ -94,6 +94,11 @@ View::View()
             }));
 
     m_processor.registerCommand(
+        "unbind",
+        std::function<void(std::string)>(
+            std::bind(&View::unbind, this, std::placeholders::_1)));
+
+    m_processor.registerCommand(
         "toggle_run", std::function<void()>([&]() { m_run = !m_run; }));
 
     m_processor.registerCommand("reset", std::function<void()>([&]() {
@@ -319,9 +324,7 @@ void View::bind(std::string str, const std::function<void()> &handler)
     {
         action = m_actions[key_sequence].first;
         action->setText(str.c_str());
-
-        QMetaObject::Connection connection = m_actions[key_sequence].second;
-        QObject::disconnect(connection);
+        QObject::disconnect(m_actions[key_sequence].second);
     }
     else
     {
@@ -350,6 +353,17 @@ void View::bind(std::string str, const std::function<void()> &handler)
         });
 
     m_actions[key_sequence] = std::make_pair(action, connection);
+}
+
+void View::unbind(const std::string &str)
+{
+    QKeySequence key_sequence = QKeySequence::fromString(str.c_str());
+
+    auto it = m_actions.find(key_sequence);
+    if (it != m_actions.end())
+    {
+        QObject::disconnect(it->second.second);
+    }
 }
 
 void View::timerEvent(QTimerEvent *)
