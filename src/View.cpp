@@ -1,6 +1,7 @@
 #include "View.hpp"
 #include <algorithm>
-#include <QtGui/QtGui>
+#include <cctype>
+#include <sstream>
 #include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
 #include "TransitionGraphicsObject.hpp"
@@ -37,8 +38,22 @@ View::View()
     font.setPixelSize(16);
     m_console.setFont(font);
 
-    m_console.setProcesor(
-        [](const std::string &command) { std::cout << command << std::endl; });
+    m_console.setProcesor([&](const std::string &str) {
+        std::istringstream stream(str);
+
+        std::vector<std::string> words{
+            std::istream_iterator<std::string>(stream),
+            std::istream_iterator<std::string>()};
+
+        if (words.size() < 2)
+        {
+            m_console << "Whoops...\n";
+        }
+        else
+        {
+            bind(words[0], [=]() { std::cout << words[1] << std::endl; });
+        }
+    });
 
     setFocus();
 
@@ -47,6 +62,50 @@ View::View()
 
 View::~View()
 {
+}
+
+void View::bind(std::string str, const std::function<void()> &handler)
+{
+    static const std::vector<std::string> c_special_keys{
+        "esc",  "f1",     "f2",  "f3",        "f4",     "f5",    "f6",
+        "f7",   "f8",     "f9",  "f10",       "f11",    "f12",   "home",
+        "pgup", "pgdown", "end", "backspace", "delete", "up",    "left",
+        "down", "right",  "tab", "space",     "return", "enter", "pause"};
+
+    std::transform(std::begin(str), std::end(str), std::begin(str), ::tolower);
+
+    QKeySequence key_sequence = QKeySequence::fromString(str.c_str());
+
+    if (((str.size() != 1 || !isprint(str[0])) &&
+         std::find(std::begin(c_special_keys), std::end(c_special_keys), str) ==
+             std::end(c_special_keys)) ||
+        key_sequence[0] == Qt::Key_unknown)
+    {
+        m_console << "error: invalid key\n";
+        return;
+    }
+
+    QAction *action;
+
+    if (m_actions.find(key_sequence) != m_actions.end())
+    {
+        action = m_actions[key_sequence].first;
+        action->setText(str.c_str());
+
+        QMetaObject::Connection connection = m_actions[key_sequence].second;
+        QObject::disconnect(connection);
+    }
+    else
+    {
+        action = new QAction(str.c_str(), this);
+        addAction(action);
+    }
+
+    action->setShortcut(key_sequence);
+
+    QMetaObject::Connection connection =
+        QObject::connect(action, &QAction::triggered, handler);
+    m_actions[key_sequence] = std::make_pair(action, connection);
 }
 
 void View::timerEvent(QTimerEvent *)
@@ -63,6 +122,8 @@ void View::resizeEvent(QResizeEvent *)
 
 void View::mousePressEvent(QMouseEvent *e)
 {
+    setFocus();
+
     if (!(e->button() & Qt::LeftButton) && !(e->button() & Qt::RightButton))
     {
         return;
@@ -198,6 +259,11 @@ void View::mouseMoveEvent(QMouseEvent *e)
 
 void View::wheelEvent(QWheelEvent *e)
 {
+    if (!hasFocus())
+    {
+        return;
+    }
+
     if (e->delta() > 0)
     {
         m_scale *= 1.1;

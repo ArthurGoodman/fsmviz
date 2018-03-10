@@ -1,6 +1,9 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
+#include <map>
+#include <utility>
 #include <QtWidgets/QWidget>
 #include "GraphicsObject.hpp"
 #include "qconsole/QConsole.hpp"
@@ -15,6 +18,8 @@ public: // methods
     View();
 
     virtual ~View();
+
+    void bind(std::string str, const std::function<void()> &handler);
 
 protected: // methods
     void timerEvent(QTimerEvent *e) override;
@@ -64,6 +69,9 @@ private: // fields
 
     qconsole::QConsole m_console;
     bool m_console_visible;
+
+    std::map<QKeySequence, std::pair<QAction *, QMetaObject::Connection>>
+        m_actions;
 };
 
 } // namespace fsmviz
