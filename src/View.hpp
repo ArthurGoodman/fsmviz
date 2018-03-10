@@ -38,6 +38,13 @@ private: // types
     using TimePoint = Clock::time_point;
     using Duration = std::chrono::duration<float>;
 
+    enum class DefaultSymbol
+    {
+        Epsilon,
+        Random,
+        Letter,
+    };
+
 private: // methods
     void interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract);
 
@@ -78,6 +85,9 @@ private: // fields
     gcp::GenericCommandProcessor m_processor;
 
     bool m_shortcuts_enabled;
+
+    DefaultSymbol m_default_symbol;
+    char m_default_letter;
 };
 
 } // namespace fsmviz

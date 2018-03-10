@@ -106,7 +106,7 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
         p.fillPath(path, color);
         p.strokePath(path, pen);
 
-        if (m_symbol > 0)
+        if (m_symbol > 0 && m_end)
         {
             p.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
 

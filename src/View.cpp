@@ -1,6 +1,8 @@
 #include "View.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#include <ctime>
 #include <iterator>
 #include <sstream>
 #include <QtWidgets/QtWidgets>
@@ -23,6 +25,8 @@ View::View()
     , m_console_visible{false}
     , m_shortcuts_enabled{true} ///@ refactor
 {
+    std::srand(std::time(nullptr));
+
     QSize screen_size = qApp->primaryScreen()->size();
     QPoint screen_center =
         QPoint(screen_size.width() / 2, screen_size.height() / 2);
@@ -244,6 +248,28 @@ View::View()
             }
         }));
 
+    m_processor.registerCommand(
+        "default_symbol",
+        std::function<void(std::string)>([&](std::string sym) {
+            if (sym == "epsilon")
+            {
+                m_default_symbol = DefaultSymbol::Epsilon;
+            }
+            else if (sym == "random")
+            {
+                m_default_symbol = DefaultSymbol::Random;
+            }
+            else if (sym.size() == 1 && sym[0] >= 'a' && sym[0] <= 'z')
+            {
+                m_default_symbol = DefaultSymbol::Letter;
+                m_default_letter = sym[0];
+            }
+            else
+            {
+                m_console << "error: invalid symbol\n";
+            }
+        }));
+
     ////////////////////////////////////////////////////////////////////////////
     // Key bindings
     ////////////////////////////////////////////////////////////////////////////
@@ -395,6 +421,20 @@ void View::mousePressEvent(QMouseEvent *e)
             m_objects.emplace_back(transition);
             m_transitions.emplace_back(transition);
             updateConnectedComponents();
+
+            switch (m_default_symbol)
+            {
+            case DefaultSymbol::Epsilon:
+                break;
+
+            case DefaultSymbol::Random:
+                transition->setSymbol('a' + std::rand() % ('z' - 'a' + 1));
+                break;
+
+            case DefaultSymbol::Letter:
+                transition->setSymbol(m_default_letter);
+                break;
+            }
 
             m_moving = true;
         }
