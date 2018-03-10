@@ -77,203 +77,187 @@ View::View()
         }
     });
 
-    m_processor.registerCommand(
-        "quit", std::function<void()>([&]() { close(); }));
-    m_processor.registerCommand(
-        "exit", std::function<void()>([&]() { close(); }));
+    m_processor.registerCommand("quit", [&]() { close(); });
+    m_processor.registerCommand("exit", [&]() { close(); });
 
     m_processor.registerCommand(
-        "bind",
-        std::function<void(std::string, std::string)>(
-            [&](std::string key, std::string command) {
-                bind(key, [this, command]() {
-                    from_key = true;
-                    m_processor.process(command);
-                    from_key = false;
-                });
-            }));
+        "bind", [&](const std::string &key, const std::string &command) {
+            bind(key, [=]() {
+                from_key = true;
+                m_processor.process(command);
+                from_key = false;
+            });
+        });
 
+    ///@todo fix for std::bind
     m_processor.registerCommand(
         "unbind",
-        std::function<void(std::string)>(
+        std::function<void(const std::string &)>(
             std::bind(&View::unbind, this, std::placeholders::_1)));
 
-    m_processor.registerCommand(
-        "toggle_run", std::function<void()>([&]() { m_run = !m_run; }));
+    m_processor.registerCommand("toggle_run", [&]() { m_run = !m_run; });
 
-    m_processor.registerCommand("reset", std::function<void()>([&]() {
-                                    m_translation = QPointF();
-                                    m_scale = 1;
-                                    m_objects.clear();
-                                    m_states.clear();
-                                    m_transitions.clear();
-                                }));
-
-    m_processor.registerCommand("antialias", std::function<void()>([&]() {
-                                    m_antialias = !m_antialias;
-                                }));
+    m_processor.registerCommand("reset", [&]() {
+        m_translation = QPointF();
+        m_scale = 1;
+        m_objects.clear();
+        m_states.clear();
+        m_transitions.clear();
+    });
 
     m_processor.registerCommand(
-        "delete", std::function<void()>([&]() {
-            if (m_selected_object)
-            {
-                StateGraphicsObjectPtr state =
-                    cast<StateGraphicsObject>(m_selected_object);
-                if (state)
-                {
-                    ///@ boilerplate
-                    m_objects.erase(std::remove(
-                        std::begin(m_objects), std::end(m_objects), state));
-                    m_states.erase(std::remove(
-                        std::begin(m_states), std::end(m_states), state));
+        "antialias", [&]() { m_antialias = !m_antialias; });
 
-                    auto transitions = state->getTransitions();
-
-                    for (TransitionGraphicsObjectPtr tr : transitions)
-                    {
-                        tr->getStart()->disconnect(tr);
-
-                        if (tr->getEnd() != tr->getStart())
-                        {
-                            tr->getEnd()->disconnect(tr);
-                        }
-                    }
-
-                    ///@ boilerplate
-                    m_objects.erase(
-                        std::remove_if(
-                            std::begin(m_objects),
-                            std::end(m_objects),
-                            [&](GraphicsObjectPtr obj) {
-                                return std::find(
-                                           std::begin(transitions),
-                                           std::end(transitions),
-                                           obj) != transitions.end();
-                            }),
-                        std::end(m_objects));
-
-                    m_transitions.erase(
-                        std::remove_if(
-                            std::begin(m_transitions),
-                            std::end(m_transitions),
-                            [&](TransitionGraphicsObjectPtr obj) {
-                                return std::find(
-                                           std::begin(transitions),
-                                           std::end(transitions),
-                                           obj) != transitions.end();
-                            }),
-                        std::end(m_transitions));
-                }
-                else
-                {
-                    TransitionGraphicsObjectPtr transition =
-                        cast<TransitionGraphicsObject>(m_selected_object);
-                    if (transition && transition->getEnd())
-                    {
-                        transition->getStart()->disconnect(transition);
-                        transition->getEnd()->disconnect(transition);
-
-                        ///@ boilerplate
-                        m_objects.erase(std::remove(
-                            std::begin(m_objects),
-                            std::end(m_objects),
-                            m_selected_object));
-                        m_transitions.erase(std::remove(
-                            std::begin(m_transitions),
-                            std::end(m_transitions),
-                            transition));
-                    }
-                }
-
-                m_selected_object = nullptr;
-                updateConnectedComponents();
-            }
-        }));
-
-    m_processor.registerCommand(
-        "toggle_fullscreen", std::function<void()>([&]() {
-            isFullScreen() ? showNormal() : showFullScreen();
-        }));
-
-    m_processor.registerCommand(
-        "show_fullscreen", std::function<void()>([&]() { showFullScreen(); }));
-
-    m_processor.registerCommand(
-        "show_normal", std::function<void()>([&]() { showNormal(); }));
-
-    m_processor.registerCommand(
-        "toggle_starting", std::function<void()>([&]() {
+    m_processor.registerCommand("delete", [&]() {
+        if (m_selected_object)
+        {
             StateGraphicsObjectPtr state =
                 cast<StateGraphicsObject>(m_selected_object);
             if (state)
             {
-                state->toggleStarting();
-            }
-        }));
+                ///@ boilerplate
+                m_objects.erase(std::remove(
+                    std::begin(m_objects), std::end(m_objects), state));
+                m_states.erase(std::remove(
+                    std::begin(m_states), std::end(m_states), state));
 
-    m_processor.registerCommand(
-        "toggle_final", std::function<void()>([&]() {
-            StateGraphicsObjectPtr state =
-                cast<StateGraphicsObject>(m_selected_object);
-            if (state)
-            {
-                state->toggleFinal();
-            }
-        }));
+                auto transitions = state->getTransitions();
 
-    m_processor.registerCommand(
-        "run", std::function<void()>([&]() { m_run = true; }));
+                for (TransitionGraphicsObjectPtr tr : transitions)
+                {
+                    tr->getStart()->disconnect(tr);
 
-    m_processor.registerCommand(
-        "stop", std::function<void()>([&]() { m_run = false; }));
+                    if (tr->getEnd() != tr->getStart())
+                    {
+                        tr->getEnd()->disconnect(tr);
+                    }
+                }
 
-    m_processor.registerCommand("clear", std::function<void()>([&]() {
-                                    m_console.clear();
-                                    if (from_key)
-                                    {
-                                        m_console.insertPrompt();
-                                    }
-                                }));
-    m_processor.registerCommand("cls", std::function<void()>([&]() {
-                                    m_console.clear();
-                                    if (from_key)
-                                    {
-                                        m_console.insertPrompt();
-                                    }
-                                }));
+                ///@ boilerplate
+                m_objects.erase(
+                    std::remove_if(
+                        std::begin(m_objects),
+                        std::end(m_objects),
+                        [&](GraphicsObjectPtr obj) {
+                            return std::find(
+                                       std::begin(transitions),
+                                       std::end(transitions),
+                                       obj) != transitions.end();
+                        }),
+                    std::end(m_objects));
 
-    m_processor.registerCommand(
-        "edit", std::function<void()>([&]() {
-            TransitionGraphicsObjectPtr transition =
-                cast<TransitionGraphicsObject>(m_selected_object);
-            if (transition)
-            {
-                m_shortcuts_enabled = false;
-                transition->setSymbol(-1); ///@ refactor
-            }
-        }));
-
-    m_processor.registerCommand(
-        "default_symbol",
-        std::function<void(std::string)>([&](std::string sym) {
-            if (sym == "epsilon")
-            {
-                m_default_symbol = DefaultSymbol::Epsilon;
-            }
-            else if (sym == "random")
-            {
-                m_default_symbol = DefaultSymbol::Random;
-            }
-            else if (sym.size() == 1 && std::isalnum(sym[0]))
-            {
-                m_default_symbol = DefaultSymbol::Letter;
-                m_default_letter = sym[0];
+                m_transitions.erase(
+                    std::remove_if(
+                        std::begin(m_transitions),
+                        std::end(m_transitions),
+                        [&](TransitionGraphicsObjectPtr obj) {
+                            return std::find(
+                                       std::begin(transitions),
+                                       std::end(transitions),
+                                       obj) != transitions.end();
+                        }),
+                    std::end(m_transitions));
             }
             else
             {
-                m_console << "error: invalid symbol\n";
+                TransitionGraphicsObjectPtr transition =
+                    cast<TransitionGraphicsObject>(m_selected_object);
+                if (transition && transition->getEnd())
+                {
+                    transition->getStart()->disconnect(transition);
+                    transition->getEnd()->disconnect(transition);
+
+                    ///@ boilerplate
+                    m_objects.erase(std::remove(
+                        std::begin(m_objects),
+                        std::end(m_objects),
+                        m_selected_object));
+                    m_transitions.erase(std::remove(
+                        std::begin(m_transitions),
+                        std::end(m_transitions),
+                        transition));
+                }
             }
-        }));
+
+            m_selected_object = nullptr;
+            updateConnectedComponents();
+        }
+    });
+
+    m_processor.registerCommand("toggle_fullscreen", [&]() {
+        isFullScreen() ? showNormal() : showFullScreen();
+    });
+
+    m_processor.registerCommand("show_fullscreen", [&]() { showFullScreen(); });
+    m_processor.registerCommand("show_normal", [&]() { showNormal(); });
+
+    m_processor.registerCommand("toggle_starting", [&]() {
+        StateGraphicsObjectPtr state =
+            cast<StateGraphicsObject>(m_selected_object);
+        if (state)
+        {
+            state->toggleStarting();
+        }
+    });
+
+    m_processor.registerCommand("toggle_final", [&]() {
+        StateGraphicsObjectPtr state =
+            cast<StateGraphicsObject>(m_selected_object);
+        if (state)
+        {
+            state->toggleFinal();
+        }
+    });
+
+    m_processor.registerCommand("run", [&]() { m_run = true; });
+    m_processor.registerCommand("stop", [&]() { m_run = false; });
+
+    m_processor.registerCommand("clear", [&]() {
+        m_console.clear();
+        if (from_key)
+        {
+            m_console.insertPrompt();
+        }
+    });
+
+    ///@ boilerplate
+    m_processor.registerCommand("cls", [&]() {
+        m_console.clear();
+        if (from_key)
+        {
+            m_console.insertPrompt();
+        }
+    });
+
+    m_processor.registerCommand("edit", [&]() {
+        TransitionGraphicsObjectPtr transition =
+            cast<TransitionGraphicsObject>(m_selected_object);
+        if (transition)
+        {
+            m_shortcuts_enabled = false;
+            transition->setSymbol(-1); ///@ refactor
+        }
+    });
+
+    m_processor.registerCommand("default_symbol", [&](const std::string &sym) {
+        if (sym == "epsilon")
+        {
+            m_default_symbol = DefaultSymbol::Epsilon;
+        }
+        else if (sym == "random")
+        {
+            m_default_symbol = DefaultSymbol::Random;
+        }
+        else if (sym.size() == 1 && std::isalnum(sym[0]))
+        {
+            m_default_symbol = DefaultSymbol::Letter;
+            m_default_letter = sym[0];
+        }
+        else
+        {
+            m_console << "error: invalid symbol\n";
+        }
+    });
 
     ////////////////////////////////////////////////////////////////////////////
     // Key bindings
