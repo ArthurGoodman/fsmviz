@@ -8,10 +8,13 @@
 #include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
 #include "TransitionGraphicsObject.hpp"
+#include "fsm/fsm.hpp"
 
 #include <iostream>
 
 namespace fsmviz {
+
+static std::size_t g_state_num = 0;
 
 View::View()
     : m_selected_object{nullptr}
@@ -103,6 +106,8 @@ View::View()
         m_objects.clear();
         m_states.clear();
         m_transitions.clear();
+
+        g_state_num = 0;
     });
 
     m_processor.registerCommand(
@@ -259,6 +264,105 @@ View::View()
         }
     });
 
+    auto printFsm = [&](const fsm::Fsm &fsm) {
+        std::stringstream stream;
+        stream << fsm;
+        m_console << stream.str();
+    };
+
+    auto writeFsm = [&]() {
+        fsm::Fsm fsm(m_states.size());
+
+        std::map<StateGraphicsObjectPtr, std::size_t> state_indices;
+
+        std::size_t i = 0;
+        for (StateGraphicsObjectPtr s : m_states)
+        {
+            if (s->isStarting())
+            {
+                fsm.setStarting(i);
+            }
+
+            if (s->isFinal())
+            {
+                fsm.setFinal(i);
+            }
+
+            state_indices[s] = i++;
+        }
+
+        for (TransitionGraphicsObjectPtr t : m_transitions)
+        {
+            fsm.connect(
+                state_indices[t->getStart()],
+                state_indices[t->getEnd()],
+                t->getSymbol());
+        }
+
+        return fsm;
+    };
+
+    auto readFsm = [&](const fsm::Fsm &fsm) {
+        m_processor.process("reset");
+
+        auto transitions = fsm.getTransitions();
+        auto starting_states = fsm.getStartingStates();
+        auto final_states = fsm.getFinalStates();
+
+        auto pos = []() {
+            return QVector2D(
+                static_cast<float>(std::rand()) / RAND_MAX,
+                static_cast<float>(std::rand()) / RAND_MAX);
+        };
+
+        for (fsm::Fsm::state_t s = 0; s < transitions.size(); s++)
+        {
+            StateGraphicsObjectPtr state{
+                new StateGraphicsObject(pos(), g_state_num++)};
+            m_objects.emplace_back(state);
+            m_states.emplace_back(state);
+
+            if (starting_states.find(s) != starting_states.end())
+            {
+                state->toggleStarting();
+            }
+
+            if (final_states.find(s) != final_states.end())
+            {
+                state->toggleFinal();
+            }
+        }
+
+        for (fsm::Fsm::state_t s1 = 0; s1 < transitions.size(); s1++)
+        {
+            for (fsm::Fsm::state_t s2 = 0; s2 < transitions.size(); s2++)
+            {
+                for (fsm::Fsm::symbol_t a : transitions[s1][s2])
+                {
+                    TransitionGraphicsObjectPtr transition{
+                        new TransitionGraphicsObject(m_states[s1], pos())};
+
+                    transition->setEnd(m_states[s2]);
+                    transition->setSymbol(a);
+
+                    m_states[s1]->connect(transition);
+                    m_states[s2]->connect(transition);
+
+                    m_objects.emplace_back(transition);
+                    m_transitions.emplace_back(transition);
+                }
+            }
+        }
+
+        updateConnectedComponents();
+    };
+
+    m_processor.registerCommand("print", [=]() { printFsm(writeFsm()); });
+
+    m_processor.registerCommand("rev", [=]() { readFsm(writeFsm().rev()); });
+    m_processor.registerCommand("det", [=]() { readFsm(writeFsm().det()); });
+    m_processor.registerCommand("min", [=]() { readFsm(writeFsm().min()); });
+
     ////////////////////////////////////////////////////////////////////////////
     // Key bindings
     ////////////////////////////////////////////////////////////////////////////
@@ -271,6 +375,10 @@ View::View()
     bind("[", [&]() { m_processor.process("toggle_starting"); });
     bind("]", [&]() { m_processor.process("toggle_final"); });
     bind("return", [&]() { m_processor.process("edit"); });
+
+    bind("r", [&]() { m_processor.process("rev"); });
+    bind("d", [&]() { m_processor.process("det"); });
+    bind("m", [&]() { m_processor.process("min"); });
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -343,7 +451,7 @@ void View::unbind(const std::string &str)
 {
     QKeySequence key_sequence = QKeySequence::fromString(str.c_str());
 
-    auto it = m_actions.find(key_sequence);
+    const auto &it = m_actions.find(key_sequence);
     if (it != m_actions.end())
     {
         QObject::disconnect(it->second.second);
@@ -377,7 +485,7 @@ void View::mousePressEvent(QMouseEvent *e)
         m_selected_object = nullptr;
     };
 
-    QVector2D pos(e->pos() - m_translation);
+    QVector2D pos(e->pos() - m_translation - rect().center());
 
     for (GraphicsObjectPtr obj : m_objects)
     {
@@ -409,14 +517,11 @@ void View::mousePressEvent(QMouseEvent *e)
         if (state)
         {
             m_selected_object->deselect();
+
             TransitionGraphicsObjectPtr transition{
                 new TransitionGraphicsObject(state, pos)};
-            m_selected_object = transition;
+
             state->connect(transition);
-            m_selected_object->select();
-            m_objects.emplace_back(transition);
-            m_transitions.emplace_back(transition);
-            updateConnectedComponents();
 
             switch (m_default_symbol)
             {
@@ -432,16 +537,27 @@ void View::mousePressEvent(QMouseEvent *e)
                 break;
             }
 
+            m_objects.emplace_back(transition);
+            m_transitions.emplace_back(transition);
+
+            updateConnectedComponents();
+
+            m_selected_object = transition;
+            m_selected_object->select();
+
             m_moving = true;
         }
         else
         {
-            StateGraphicsObjectPtr state{new StateGraphicsObject(pos)};
-            m_selected_object = state;
-            m_selected_object->select();
+            StateGraphicsObjectPtr state{
+                new StateGraphicsObject(pos, g_state_num++)};
             m_objects.emplace_back(state);
             m_states.emplace_back(state);
+
             updateConnectedComponents();
+
+            m_selected_object = state;
+            m_selected_object->select();
         }
     }
 
@@ -455,7 +571,7 @@ void View::mouseReleaseEvent(QMouseEvent *e)
 
     if (e->button() & Qt::RightButton && m_moving && transition)
     {
-        QVector2D pos(e->pos() - m_translation);
+        QVector2D pos(e->pos() - m_translation - rect().center());
 
         StateGraphicsObjectPtr end = nullptr;
 
@@ -479,7 +595,7 @@ void View::mouseReleaseEvent(QMouseEvent *e)
 
         if (!end)
         {
-            end.reset(new StateGraphicsObject(pos));
+            end.reset(new StateGraphicsObject(pos, g_state_num++));
             m_objects.emplace_back(end);
             m_states.emplace_back(end);
         }
@@ -577,7 +693,7 @@ void View::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.fillRect(rect(), Qt::lightGray);
 
-    p.translate(m_translation);
+    p.translate(m_translation + rect().center());
 
     if (m_antialias)
     {

@@ -3,13 +3,11 @@
 
 namespace fsmviz {
 
-static std::size_t g_state_num = 0;
-
-StateGraphicsObject::StateGraphicsObject(const QVector2D &pos)
+StateGraphicsObject::StateGraphicsObject(const QVector2D &pos, std::size_t id)
     : GraphicsObject{pos}
     , m_staring{false}
     , m_final{false}
-    , m_id{g_state_num++}
+    , m_id{id}
 {
 }
 
@@ -78,6 +76,16 @@ void StateGraphicsObject::toggleStarting()
 void StateGraphicsObject::toggleFinal()
 {
     m_final = !m_final;
+}
+
+bool StateGraphicsObject::isStarting() const
+{
+    return m_staring;
+}
+
+bool StateGraphicsObject::isFinal() const
+{
+    return m_final;
 }
 
 void StateGraphicsObject::connect(TransitionGraphicsObjectPtr transition)

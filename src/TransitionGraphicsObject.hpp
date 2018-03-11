@@ -20,6 +20,7 @@ public: // methods
 
     StateGraphicsObjectPtr getStart() const;
     StateGraphicsObjectPtr getEnd() const;
+    char getSymbol() const;
 
 private: // methods
     void drawArrow(QPainter &p, const QVector2D &pos, QVector2D dir);

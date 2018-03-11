@@ -9,7 +9,7 @@ namespace fsmviz {
 class StateGraphicsObject : public GraphicsObject
 {
 public: // methods
-    StateGraphicsObject(const QVector2D &pos);
+    StateGraphicsObject(const QVector2D &pos, std::size_t id);
 
     void render(QPainter &p, int pass) override;
 
@@ -17,6 +17,9 @@ public: // methods
 
     void toggleStarting();
     void toggleFinal();
+
+    bool isStarting() const;
+    bool isFinal() const;
 
     void connect(TransitionGraphicsObjectPtr transition);
     void disconnect(TransitionGraphicsObjectPtr transition);

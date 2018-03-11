@@ -151,6 +151,11 @@ StateGraphicsObjectPtr TransitionGraphicsObject::getEnd() const
     return m_end;
 }
 
+char TransitionGraphicsObject::getSymbol() const
+{
+    return m_symbol;
+}
+
 void TransitionGraphicsObject::drawArrow(
     QPainter &p,
     const QVector2D &pos,
