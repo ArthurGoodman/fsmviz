@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 #include <iterator>
 #include <sstream>
 #include <QtWidgets/QtWidgets>
@@ -102,7 +103,7 @@ View::View()
 
     m_processor.registerCommand("reset", [&]() {
         m_translation = QPointF();
-        m_scale = 1;
+        // m_scale = 1;
         m_objects.clear();
         m_states.clear();
         m_transitions.clear();
@@ -362,6 +363,40 @@ View::View()
     m_processor.registerCommand("rev", [=]() { readFsm(writeFsm().rev()); });
     m_processor.registerCommand("det", [=]() { readFsm(writeFsm().det()); });
     m_processor.registerCommand("min", [=]() { readFsm(writeFsm().min()); });
+
+    m_processor.registerCommand("export", [&](const std::string &file_name) {
+        std::ofstream f(file_name);
+
+        f << "digraph fsm {" << std::endl;
+        f << "rankdir=LR;" << std::endl;
+        f << "node[shape=doublecircle];";
+
+        std::map<StateGraphicsObjectPtr, std::size_t> state_indices;
+
+        std::size_t i = 0;
+        for (StateGraphicsObjectPtr s : m_states)
+        {
+            if (s->isFinal())
+            {
+                f << "\"" << i << "\";";
+            }
+
+            state_indices[s] = i++;
+        }
+
+        f << std::endl;
+        f << "node[shape=circle];" << std::endl;
+
+        for (TransitionGraphicsObjectPtr t : m_transitions)
+        {
+            char sym[] = {t->getSymbol(), '\0'};
+            f << "\"" << state_indices[t->getStart()] << "\"->\""
+              << state_indices[t->getEnd()] << "\"[label=\""
+              << (t->getSymbol() ? sym : "\u03b5") << "\"];" << std::endl;
+        }
+
+        f << "}" << std::endl;
+    });
 
     ////////////////////////////////////////////////////////////////////////////
     // Key bindings
