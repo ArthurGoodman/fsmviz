@@ -24,6 +24,8 @@ public: // methods
     void bind(std::string str, const std::function<void()> &handler);
     void unbind(const std::string &str);
 
+    void renderImage(const std::string &file_name);
+
 protected: // methods
     void timerEvent(QTimerEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;
@@ -47,6 +49,8 @@ private: // types
     };
 
 private: // methods
+    void render(QPainter &p, const QRect &rect, const QPointF &translation);
+
     void interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract);
 
     void applyForces();
@@ -89,6 +93,8 @@ private: // fields
 
     DefaultSymbol m_default_symbol;
     char m_default_letter;
+
+    QVector2D m_min, m_max;
 };
 
 } // namespace fsmviz

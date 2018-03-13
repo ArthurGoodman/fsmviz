@@ -5,6 +5,7 @@
 #include <ctime>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <sstream>
 #include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
@@ -245,7 +246,7 @@ View::View()
         }
     });
 
-    m_processor.registerCommand("default_symbol", [&](const std::string &sym) {
+    m_processor.registerCommand("symbol", [&](const std::string &sym) {
         if (sym == "epsilon")
         {
             m_default_symbol = DefaultSymbol::Epsilon;
@@ -398,6 +399,10 @@ View::View()
         f << "}" << std::endl;
     });
 
+    m_processor.registerCommand("render", [&](const std::string &file_name) {
+        renderImage(file_name);
+    });
+
     ////////////////////////////////////////////////////////////////////////////
     // Key bindings
     ////////////////////////////////////////////////////////////////////////////
@@ -491,6 +496,23 @@ void View::unbind(const std::string &str)
     {
         QObject::disconnect(it->second.second);
     }
+}
+
+void View::renderImage(const std::string &file_name)
+{
+    static constexpr int c_border = 200;
+
+    int w = m_max.x() - m_min.x() + c_border;
+    int h = m_max.y() - m_min.y() + c_border;
+
+    QImage image(w, h, QImage::Format_RGB32);
+
+    QPainter p(&image);
+    QPointF translation =
+        image.rect().center() - ((m_min + m_max) / 2).toPointF();
+    render(p, image.rect(), translation);
+
+    image.save(file_name.c_str());
 }
 
 void View::timerEvent(QTimerEvent *)
@@ -726,9 +748,15 @@ void View::keyPressEvent(QKeyEvent *e)
 void View::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
-    p.fillRect(rect(), Qt::lightGray);
+    p.setClipRect(rect());
+    render(p, rect(), m_translation + rect().center());
+}
 
-    p.translate(m_translation + rect().center());
+void View::render(QPainter &p, const QRect &rect, const QPointF &translation)
+{
+    p.fillRect(rect, Qt::lightGray);
+
+    p.translate(translation);
 
     if (m_antialias)
     {
@@ -830,9 +858,19 @@ void View::applyForces()
 
 void View::tick()
 {
+    long double float_max = std::numeric_limits<float>::max();
+    m_min = QVector2D(float_max, float_max);
+    m_max = QVector2D(-float_max, -float_max);
+
     for (GraphicsObjectPtr obj : m_objects)
     {
         obj->tick(Duration(Clock::now() - m_time).count());
+
+        QVector2D pos = obj->getPos();
+        m_min = QVector2D(
+            std::min(m_min.x(), pos.x()), std::min(m_min.y(), pos.y()));
+        m_max = QVector2D(
+            std::max(m_max.x(), pos.x()), std::max(m_max.y(), pos.y()));
     }
 
     m_time = Clock::now();
