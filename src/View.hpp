@@ -6,6 +6,7 @@
 #include <string>
 #include <utility>
 #include <QtWidgets/QWidget>
+#include "Controller.hpp"
 #include "GraphicsObject.hpp"
 #include "gcp/GenericCommandProcessor.hpp"
 #include "qconsole/QConsole.hpp"
@@ -17,14 +18,34 @@ class View : public QWidget
     Q_OBJECT
 
 public: // methods
-    View();
-
+    explicit View(
+        gcp::GenericCommandProcessor &processor,
+        Controller &controller);
     virtual ~View();
 
     void bind(std::string str, const std::function<void()> &handler);
     void unbind(const std::string &str);
 
     void renderImage(const std::string &file_name);
+
+    ///@todo Reoreder methods
+    GraphicsObjectPtr getSelectedObject() const;
+    void deselect();
+
+    void disableShortcuts();
+
+    qconsole::QConsole &getConsole();
+
+    void toggleFullscreen();
+    void toggleAntialiasing();
+    void toggleRun();
+
+    void run();
+    void stop();
+
+    void reset();
+
+    void edit();
 
 protected: // methods
     void timerEvent(QTimerEvent *e) override;
@@ -41,13 +62,6 @@ private: // types
     using TimePoint = Clock::time_point;
     using Duration = std::chrono::duration<float>;
 
-    enum class DefaultSymbol
-    {
-        Epsilon,
-        Random,
-        Letter,
-    };
-
 private: // methods
     void render(QPainter &p, const QRect &rect, const QPointF &translation);
 
@@ -56,17 +70,14 @@ private: // methods
     void applyForces();
     void tick();
 
-    void updateConnectedComponents();
-
     void toggleConsole();
 
 private slots:
     void resizeConsole();
 
 private: // fields
-    std::vector<GraphicsObjectPtr> m_objects;
-    std::vector<StateGraphicsObjectPtr> m_states;
-    std::vector<TransitionGraphicsObjectPtr> m_transitions;
+    gcp::GenericCommandProcessor &m_processor;
+    Controller &m_controller;
 
     GraphicsObjectPtr m_selected_object;
 
@@ -87,12 +98,7 @@ private: // fields
     std::map<QKeySequence, std::pair<QAction *, QMetaObject::Connection>>
         m_actions;
 
-    gcp::GenericCommandProcessor m_processor;
-
-    bool m_shortcuts_enabled;
-
-    DefaultSymbol m_default_symbol;
-    char m_default_letter;
+    bool m_editing;
 
     QVector2D m_min, m_max;
 };

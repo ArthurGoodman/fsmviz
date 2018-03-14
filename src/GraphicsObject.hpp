@@ -8,8 +8,8 @@ namespace fsmviz {
 class GraphicsObject
 {
 public: // methods
-    GraphicsObject();
-    GraphicsObject(const QVector2D &pos);
+    explicit GraphicsObject();
+    explicit GraphicsObject(const QVector2D &pos);
 
     virtual ~GraphicsObject();
 

@@ -9,7 +9,7 @@ namespace fsmviz {
 class StateGraphicsObject : public GraphicsObject
 {
 public: // methods
-    StateGraphicsObject(const QVector2D &pos, std::size_t id);
+    explicit StateGraphicsObject(const QVector2D &pos, std::size_t id);
 
     void render(QPainter &p, int pass) override;
 

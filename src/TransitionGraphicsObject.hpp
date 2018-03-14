@@ -7,7 +7,7 @@ namespace fsmviz {
 class TransitionGraphicsObject : public GraphicsObject
 {
 public: // methods
-    TransitionGraphicsObject(
+    explicit TransitionGraphicsObject(
         StateGraphicsObjectPtr start,
         const QVector2D &pos);
 

@@ -3,23 +3,19 @@
 #include <cctype>
 #include <cstdlib>
 #include <ctime>
-#include <fstream>
 #include <iterator>
 #include <limits>
 #include <sstream>
 #include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
 #include "TransitionGraphicsObject.hpp"
-#include "fsm/fsm.hpp"
-
-#include <iostream>
 
 namespace fsmviz {
 
-static std::size_t g_state_num = 0;
-
-View::View()
-    : m_selected_object{nullptr}
+View::View(gcp::GenericCommandProcessor &processor, Controller &controller)
+    : m_processor{processor}
+    , m_controller{controller}
+    , m_selected_object{nullptr}
     , m_translating{false}
     , m_moving{false}
     , m_run{false}
@@ -28,7 +24,7 @@ View::View()
     , m_time{Clock::now()}
     , m_console{this}
     , m_console_visible{false}
-    , m_shortcuts_enabled{true} ///@ refactor
+    , m_editing{false} ///@ refactor (maybe...)
 {
     std::srand(std::time(nullptr));
 
@@ -60,350 +56,6 @@ View::View()
         std::placeholders::_1));
 
     ////////////////////////////////////////////////////////////////////////////
-    // Processor commands
-    ////////////////////////////////////////////////////////////////////////////
-
-    ///@todo Move commands into separate methods
-
-    ///@ temporary workaround
-    static bool from_key = false;
-
-    m_processor.registerErrorCallback([&](const std::string &message) {
-        if (from_key)
-        {
-            m_console.insertBlock();
-        }
-
-        m_console << "error: " << message << "\n";
-
-        if (from_key)
-        {
-            m_console.insertPrompt();
-        }
-    });
-
-    m_processor.registerCommand("quit", [&]() { close(); });
-    m_processor.registerCommand("exit", [&]() { close(); });
-
-    m_processor.registerCommand(
-        "bind", [&](const std::string &key, const std::string &command) {
-            bind(key, [=]() {
-                from_key = true;
-                m_processor.process(command);
-                from_key = false;
-            });
-        });
-
-    ///@todo fix for std::bind
-    m_processor.registerCommand(
-        "unbind",
-        std::function<void(const std::string &)>(
-            std::bind(&View::unbind, this, std::placeholders::_1)));
-
-    m_processor.registerCommand("toggle_run", [&]() { m_run = !m_run; });
-
-    m_processor.registerCommand("reset", [&]() {
-        m_translation = QPointF();
-        // m_scale = 1;
-        m_objects.clear();
-        m_states.clear();
-        m_transitions.clear();
-
-        g_state_num = 0;
-    });
-
-    m_processor.registerCommand(
-        "antialias", [&]() { m_antialias = !m_antialias; });
-
-    m_processor.registerCommand("delete", [&]() {
-        if (m_selected_object)
-        {
-            StateGraphicsObjectPtr state =
-                cast<StateGraphicsObject>(m_selected_object);
-            if (state)
-            {
-                ///@ boilerplate
-                m_objects.erase(std::remove(
-                    std::begin(m_objects), std::end(m_objects), state));
-                m_states.erase(std::remove(
-                    std::begin(m_states), std::end(m_states), state));
-
-                auto transitions = state->getTransitions();
-
-                for (TransitionGraphicsObjectPtr tr : transitions)
-                {
-                    tr->getStart()->disconnect(tr);
-
-                    if (tr->getEnd() != tr->getStart())
-                    {
-                        tr->getEnd()->disconnect(tr);
-                    }
-                }
-
-                ///@ boilerplate
-                m_objects.erase(
-                    std::remove_if(
-                        std::begin(m_objects),
-                        std::end(m_objects),
-                        [&](GraphicsObjectPtr obj) {
-                            return std::find(
-                                       std::begin(transitions),
-                                       std::end(transitions),
-                                       obj) != transitions.end();
-                        }),
-                    std::end(m_objects));
-
-                m_transitions.erase(
-                    std::remove_if(
-                        std::begin(m_transitions),
-                        std::end(m_transitions),
-                        [&](TransitionGraphicsObjectPtr obj) {
-                            return std::find(
-                                       std::begin(transitions),
-                                       std::end(transitions),
-                                       obj) != transitions.end();
-                        }),
-                    std::end(m_transitions));
-            }
-            else
-            {
-                TransitionGraphicsObjectPtr transition =
-                    cast<TransitionGraphicsObject>(m_selected_object);
-                if (transition && transition->getEnd())
-                {
-                    transition->getStart()->disconnect(transition);
-                    transition->getEnd()->disconnect(transition);
-
-                    ///@ boilerplate
-                    m_objects.erase(std::remove(
-                        std::begin(m_objects),
-                        std::end(m_objects),
-                        m_selected_object));
-                    m_transitions.erase(std::remove(
-                        std::begin(m_transitions),
-                        std::end(m_transitions),
-                        transition));
-                }
-            }
-
-            m_selected_object = nullptr;
-            updateConnectedComponents();
-        }
-    });
-
-    m_processor.registerCommand("toggle_fullscreen", [&]() {
-        isFullScreen() ? showNormal() : showFullScreen();
-    });
-
-    m_processor.registerCommand("show_fullscreen", [&]() { showFullScreen(); });
-    m_processor.registerCommand("show_normal", [&]() { showNormal(); });
-
-    m_processor.registerCommand("toggle_starting", [&]() {
-        StateGraphicsObjectPtr state =
-            cast<StateGraphicsObject>(m_selected_object);
-        if (state)
-        {
-            state->toggleStarting();
-        }
-    });
-
-    m_processor.registerCommand("toggle_final", [&]() {
-        StateGraphicsObjectPtr state =
-            cast<StateGraphicsObject>(m_selected_object);
-        if (state)
-        {
-            state->toggleFinal();
-        }
-    });
-
-    m_processor.registerCommand("run", [&]() { m_run = true; });
-    m_processor.registerCommand("stop", [&]() { m_run = false; });
-
-    m_processor.registerCommand("clear", [&]() {
-        m_console.clear();
-        if (from_key)
-        {
-            m_console.insertPrompt();
-        }
-    });
-
-    ///@ boilerplate
-    m_processor.registerCommand("cls", [&]() {
-        m_console.clear();
-        if (from_key)
-        {
-            m_console.insertPrompt();
-        }
-    });
-
-    m_processor.registerCommand("edit", [&]() {
-        TransitionGraphicsObjectPtr transition =
-            cast<TransitionGraphicsObject>(m_selected_object);
-        if (transition)
-        {
-            m_shortcuts_enabled = false;
-            transition->setSymbol(-1); ///@ refactor
-        }
-    });
-
-    m_processor.registerCommand("symbol", [&](const std::string &sym) {
-        if (sym == "epsilon")
-        {
-            m_default_symbol = DefaultSymbol::Epsilon;
-        }
-        else if (sym == "random")
-        {
-            m_default_symbol = DefaultSymbol::Random;
-        }
-        else if (sym.size() == 1 && std::isalnum(sym[0]))
-        {
-            m_default_symbol = DefaultSymbol::Letter;
-            m_default_letter = sym[0];
-        }
-        else
-        {
-            m_console << "error: invalid symbol\n";
-        }
-    });
-
-    auto printFsm = [&](const fsm::Fsm &fsm) {
-        std::stringstream stream;
-        stream << fsm;
-        m_console << stream.str();
-    };
-
-    auto writeFsm = [&]() {
-        fsm::Fsm fsm(m_states.size());
-
-        std::map<StateGraphicsObjectPtr, std::size_t> state_indices;
-
-        std::size_t i = 0;
-        for (StateGraphicsObjectPtr s : m_states)
-        {
-            if (s->isStarting())
-            {
-                fsm.setStarting(i);
-            }
-
-            if (s->isFinal())
-            {
-                fsm.setFinal(i);
-            }
-
-            state_indices[s] = i++;
-        }
-
-        for (TransitionGraphicsObjectPtr t : m_transitions)
-        {
-            fsm.connect(
-                state_indices[t->getStart()],
-                state_indices[t->getEnd()],
-                t->getSymbol());
-        }
-
-        return fsm;
-    };
-
-    auto readFsm = [&](const fsm::Fsm &fsm) {
-        m_processor.process("reset");
-
-        auto transitions = fsm.getTransitions();
-        auto starting_states = fsm.getStartingStates();
-        auto final_states = fsm.getFinalStates();
-
-        auto pos = []() {
-            return QVector2D(
-                static_cast<float>(std::rand()) / RAND_MAX,
-                static_cast<float>(std::rand()) / RAND_MAX);
-        };
-
-        for (fsm::Fsm::state_t s = 0; s < transitions.size(); s++)
-        {
-            StateGraphicsObjectPtr state{
-                new StateGraphicsObject(pos(), g_state_num++)};
-            m_objects.emplace_back(state);
-            m_states.emplace_back(state);
-
-            if (starting_states.find(s) != starting_states.end())
-            {
-                state->toggleStarting();
-            }
-
-            if (final_states.find(s) != final_states.end())
-            {
-                state->toggleFinal();
-            }
-        }
-
-        for (fsm::Fsm::state_t s1 = 0; s1 < transitions.size(); s1++)
-        {
-            for (fsm::Fsm::state_t s2 = 0; s2 < transitions.size(); s2++)
-            {
-                for (fsm::Fsm::symbol_t a : transitions[s1][s2])
-                {
-                    TransitionGraphicsObjectPtr transition{
-                        new TransitionGraphicsObject(m_states[s1], pos())};
-
-                    transition->setEnd(m_states[s2]);
-                    transition->setSymbol(a);
-
-                    m_states[s1]->connect(transition);
-                    m_states[s2]->connect(transition);
-
-                    m_objects.emplace_back(transition);
-                    m_transitions.emplace_back(transition);
-                }
-            }
-        }
-
-        updateConnectedComponents();
-    };
-
-    m_processor.registerCommand("print", [=]() { printFsm(writeFsm()); });
-
-    m_processor.registerCommand("rev", [=]() { readFsm(writeFsm().rev()); });
-    m_processor.registerCommand("det", [=]() { readFsm(writeFsm().det()); });
-    m_processor.registerCommand("min", [=]() { readFsm(writeFsm().min()); });
-
-    m_processor.registerCommand("export", [&](const std::string &file_name) {
-        std::ofstream f(file_name);
-
-        f << "digraph fsm {" << std::endl;
-        f << "rankdir=LR;" << std::endl;
-        f << "node[shape=doublecircle];";
-
-        std::map<StateGraphicsObjectPtr, std::size_t> state_indices;
-
-        std::size_t i = 0;
-        for (StateGraphicsObjectPtr s : m_states)
-        {
-            if (s->isFinal())
-            {
-                f << "\"" << i << "\";";
-            }
-
-            state_indices[s] = i++;
-        }
-
-        f << std::endl;
-        f << "node[shape=circle];" << std::endl;
-
-        for (TransitionGraphicsObjectPtr t : m_transitions)
-        {
-            char sym[] = {t->getSymbol(), '\0'};
-            f << "\"" << state_indices[t->getStart()] << "\"->\""
-              << state_indices[t->getEnd()] << "\"[label=\""
-              << (t->getSymbol() ? sym : "\u03b5") << "\"];" << std::endl;
-        }
-
-        f << "}" << std::endl;
-    });
-
-    m_processor.registerCommand("render", [&](const std::string &file_name) {
-        renderImage(file_name);
-    });
-
-    ////////////////////////////////////////////////////////////////////////////
     // Key bindings
     ////////////////////////////////////////////////////////////////////////////
 
@@ -431,6 +83,7 @@ View::~View()
 
 void View::bind(std::string str, const std::function<void()> &handler)
 {
+    ///@todo Add more keys (and key sequences)
     static const std::vector<std::string> c_special_keys{
         "f1",     "f2",  "f3",        "f4",     "f5",    "f6",   "f7",
         "f8",     "f9",  "f10",       "f11",    "f12",   "home", "pgup",
@@ -468,7 +121,7 @@ void View::bind(std::string str, const std::function<void()> &handler)
 
     QMetaObject::Connection connection =
         QObject::connect(action, &QAction::triggered, [=]() {
-            if (m_shortcuts_enabled)
+            if (!m_editing)
             {
                 handler();
             }
@@ -515,6 +168,63 @@ void View::renderImage(const std::string &file_name)
     image.save(file_name.c_str());
 }
 
+GraphicsObjectPtr View::getSelectedObject() const
+{
+    return m_selected_object;
+}
+
+void View::deselect()
+{
+    m_selected_object = nullptr;
+}
+
+qconsole::QConsole &View::getConsole()
+{
+    return m_console;
+}
+
+void View::toggleFullscreen()
+{
+    isFullScreen() ? showNormal() : showFullScreen();
+}
+
+void View::toggleAntialiasing()
+{
+    m_antialias = !m_antialias;
+}
+
+void View::toggleRun()
+{
+    m_run = !m_run;
+}
+
+void View::run()
+{
+    m_run = true;
+}
+
+void View::stop()
+{
+    m_run = false;
+}
+
+void View::reset()
+{
+    m_translation = QPointF();
+    // m_scale = 1;
+}
+
+void View::edit()
+{
+    TransitionGraphicsObjectPtr transition =
+        cast<TransitionGraphicsObject>(m_selected_object);
+    if (transition)
+    {
+        m_editing = true;
+        transition->setSymbol(-1); ///@ refactor
+    }
+}
+
 void View::timerEvent(QTimerEvent *)
 {
     applyForces();
@@ -544,14 +254,10 @@ void View::mousePressEvent(QMouseEvent *e)
 
     QVector2D pos(e->pos() - m_translation - rect().center());
 
-    for (GraphicsObjectPtr obj : m_objects)
+    m_selected_object = m_controller.objectAt(pos);
+    if (m_selected_object)
     {
-        if (obj->contains(pos))
-        {
-            obj->select();
-            m_selected_object = obj;
-            break;
-        }
+        m_selected_object->select();
     }
 
     if (e->button() & Qt::LeftButton)
@@ -575,45 +281,14 @@ void View::mousePressEvent(QMouseEvent *e)
         {
             m_selected_object->deselect();
 
-            TransitionGraphicsObjectPtr transition{
-                new TransitionGraphicsObject(state, pos)};
-
-            state->connect(transition);
-
-            switch (m_default_symbol)
-            {
-            case DefaultSymbol::Epsilon:
-                break;
-
-            case DefaultSymbol::Random:
-                transition->setSymbol('a' + std::rand() % ('z' - 'a' + 1));
-                break;
-
-            case DefaultSymbol::Letter:
-                transition->setSymbol(m_default_letter);
-                break;
-            }
-
-            m_objects.emplace_back(transition);
-            m_transitions.emplace_back(transition);
-
-            updateConnectedComponents();
-
-            m_selected_object = transition;
+            m_selected_object = m_controller.createTransition(state, pos);
             m_selected_object->select();
 
             m_moving = true;
         }
         else
         {
-            StateGraphicsObjectPtr state{
-                new StateGraphicsObject(pos, g_state_num++)};
-            m_objects.emplace_back(state);
-            m_states.emplace_back(state);
-
-            updateConnectedComponents();
-
-            m_selected_object = state;
+            m_selected_object = m_controller.createState(pos);
             m_selected_object->select();
         }
     }
@@ -629,17 +304,7 @@ void View::mouseReleaseEvent(QMouseEvent *e)
     if (e->button() & Qt::RightButton && m_moving && transition)
     {
         QVector2D pos(e->pos() - m_translation - rect().center());
-
-        StateGraphicsObjectPtr end = nullptr;
-
-        for (StateGraphicsObjectPtr state : m_states)
-        {
-            if (state->contains(pos))
-            {
-                end = state;
-                break;
-            }
-        }
+        StateGraphicsObjectPtr end = m_controller.stateAt(pos);
 
         if (m_selected_object)
         {
@@ -652,15 +317,10 @@ void View::mouseReleaseEvent(QMouseEvent *e)
 
         if (!end)
         {
-            end.reset(new StateGraphicsObject(pos, g_state_num++));
-            m_objects.emplace_back(end);
-            m_states.emplace_back(end);
+            end = m_controller.createState(pos);
         }
 
-        transition->setEnd(end);
-        end->connect(transition);
-
-        updateConnectedComponents();
+        m_controller.connectTransition(transition, end);
     }
 
     m_translating = false;
@@ -705,7 +365,7 @@ void View::keyPressEvent(QKeyEvent *e)
     TransitionGraphicsObjectPtr transition =
         cast<TransitionGraphicsObject>(m_selected_object);
 
-    if (!m_shortcuts_enabled)
+    if (m_editing)
     {
         if ((e->key() >= Qt::Key_A && e->key() <= Qt::Key_Z) ||
             (e->key() >= Qt::Key_0 && e->key() <= Qt::Key_9) ||
@@ -719,7 +379,7 @@ void View::keyPressEvent(QKeyEvent *e)
             {
                 transition->setSymbol(e->text().toUtf8().data()[0]);
             }
-            m_shortcuts_enabled = true;
+            m_editing = false;
             return;
         }
     }
@@ -727,9 +387,9 @@ void View::keyPressEvent(QKeyEvent *e)
     switch (e->key())
     {
     case Qt::Key_Escape:
-        if (!m_shortcuts_enabled)
+        if (m_editing)
         {
-            m_shortcuts_enabled = true;
+            m_editing = false;
             transition->setSymbol('\0');
         }
         else
@@ -766,7 +426,7 @@ void View::render(QPainter &p, const QRect &rect, const QPointF &translation)
     static constexpr int c_num_passes = 3;
     for (int pass = 0; pass < c_num_passes; pass++)
     {
-        for (GraphicsObjectPtr obj : m_objects)
+        for (GraphicsObjectPtr obj : m_controller.getObjects())
         {
             obj->render(p, pass);
         }
@@ -827,7 +487,7 @@ void View::applyForces()
         return;
     }
 
-    for (GraphicsObjectPtr a : m_objects)
+    for (GraphicsObjectPtr a : m_controller.getObjects())
     {
         TransitionGraphicsObjectPtr a_tr = cast<TransitionGraphicsObject>(a);
 
@@ -837,7 +497,7 @@ void View::applyForces()
             interact(a_tr, a_tr->getEnd(), true);
         }
 
-        for (GraphicsObjectPtr b : m_objects)
+        for (GraphicsObjectPtr b : m_controller.getObjects())
         {
             TransitionGraphicsObjectPtr b_tr =
                 cast<TransitionGraphicsObject>(b);
@@ -862,7 +522,7 @@ void View::tick()
     m_min = QVector2D(float_max, float_max);
     m_max = QVector2D(-float_max, -float_max);
 
-    for (GraphicsObjectPtr obj : m_objects)
+    for (GraphicsObjectPtr obj : m_controller.getObjects())
     {
         obj->tick(Duration(Clock::now() - m_time).count());
 
@@ -874,48 +534,6 @@ void View::tick()
     }
 
     m_time = Clock::now();
-}
-
-void View::updateConnectedComponents()
-{
-    std::function<void(StateGraphicsObjectPtr, int)> visitState =
-        [&](StateGraphicsObjectPtr state, int tag) {
-            if (state->getFlag())
-            {
-                return;
-            }
-
-            state->setFlag(true);
-            state->setTag(tag);
-
-            auto transitions = state->getTransitions();
-
-            for (TransitionGraphicsObjectPtr transition : transitions)
-            {
-                transition->setTag(tag);
-
-                if (transition->getStart() != state)
-                {
-                    visitState(transition->getStart(), tag);
-                }
-                else if (transition->getEnd())
-                {
-                    visitState(transition->getEnd(), tag);
-                }
-            }
-        };
-
-    for (StateGraphicsObjectPtr state : m_states)
-    {
-        state->setFlag(false);
-    }
-
-    int tag = 0;
-
-    for (StateGraphicsObjectPtr state : m_states)
-    {
-        visitState(state, tag++);
-    }
 }
 
 void View::toggleConsole()
