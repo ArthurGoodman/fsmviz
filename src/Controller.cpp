@@ -1,6 +1,7 @@
 #include "Controller.hpp"
 #include <fstream>
 #include <functional>
+#include <QtWidgets/QtWidgets>
 #include "StateGraphicsObject.hpp"
 #include "TransitionGraphicsObject.hpp"
 #include "View.hpp"
@@ -342,6 +343,17 @@ Controller::Controller(gcp::GenericCommandProcessor &processor)
     });
 
     m_processor.registerCommand("render", [&](const std::string &file_name) {
+        if (file_name.empty())
+        {
+            m_view->getConsole() << "error: empty file name\n";
+        }
+        m_view->renderImage(file_name);
+    });
+
+    m_processor.registerCommand("render", [&]() {
+        std::string file_name = QFileDialog::getSaveFileName(
+                                    m_view, "", "", "Images(*.png *.jpg *.bmp)")
+                                    .toStdString();
         m_view->renderImage(file_name);
     });
 }

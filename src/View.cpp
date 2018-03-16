@@ -153,6 +153,11 @@ void View::unbind(const std::string &str)
 
 void View::renderImage(const std::string &file_name)
 {
+    if (file_name.empty())
+    {
+        return;
+    }
+
     static constexpr int c_border = 200;
 
     int w = m_max.x() - m_min.x() + c_border;
@@ -518,9 +523,17 @@ void View::applyForces()
 
 void View::tick()
 {
-    long double float_max = std::numeric_limits<float>::max();
-    m_min = QVector2D(float_max, float_max);
-    m_max = QVector2D(-float_max, -float_max);
+    if (m_controller.getObjects().empty())
+    {
+        m_min = QVector2D();
+        m_max = QVector2D();
+    }
+    else
+    {
+        long double float_max = std::numeric_limits<float>::max();
+        m_min = QVector2D(float_max, float_max);
+        m_max = QVector2D(-float_max, -float_max);
+    }
 
     for (GraphicsObjectPtr obj : m_controller.getObjects())
     {
