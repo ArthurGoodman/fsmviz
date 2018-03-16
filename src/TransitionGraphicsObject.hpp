@@ -22,6 +22,8 @@ public: // methods
     StateGraphicsObjectPtr getEnd() const;
     char getSymbol() const;
 
+    void startEditing();
+
 private: // methods
     void drawArrow(QPainter &p, const QVector2D &pos, QVector2D dir);
 
@@ -29,6 +31,7 @@ private: // fields
     StateGraphicsObjectPtr m_start;
     StateGraphicsObjectPtr m_end;
     char m_symbol;
+    bool m_editing;
 };
 
 } // namespace fsmviz

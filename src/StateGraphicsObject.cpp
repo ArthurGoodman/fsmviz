@@ -30,8 +30,6 @@ void StateGraphicsObject::render(QPainter &p, int pass)
     p.fillPath(path, m_selected ? c_selected_color : c_default_color);
     p.strokePath(path, pen);
 
-    ///@ tmp
-
     p.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
 
     static constexpr int c_rect_size = 75;
@@ -113,6 +111,16 @@ bool StateGraphicsObject::getFlag() const
 void StateGraphicsObject::setFlag(bool flag)
 {
     m_flag = flag;
+}
+
+std::size_t StateGraphicsObject::getId() const
+{
+    return m_id;
+}
+
+void StateGraphicsObject::setId(std::size_t id)
+{
+    m_id = id;
 }
 
 } // namespace fsmviz

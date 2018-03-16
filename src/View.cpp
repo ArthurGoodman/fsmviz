@@ -12,8 +12,12 @@
 
 namespace fsmviz {
 
-View::View(gcp::GenericCommandProcessor &processor, Controller &controller)
+View::View(
+    gcp::GenericCommandProcessor &processor,
+    qconsole::QConsole &console,
+    Controller &controller)
     : m_processor{processor}
+    , m_console{console}
     , m_controller{controller}
     , m_selected_object{nullptr}
     , m_translating{false}
@@ -22,9 +26,8 @@ View::View(gcp::GenericCommandProcessor &processor, Controller &controller)
     , m_antialias{true}
     , m_scale{1}
     , m_time{Clock::now()}
-    , m_console{this}
     , m_console_visible{false}
-    , m_editing{false} ///@ refactor (maybe...)
+    , m_editing{false}
 {
     std::srand(std::time(nullptr));
 
@@ -38,26 +41,7 @@ View::View(gcp::GenericCommandProcessor &processor, Controller &controller)
     setMouseTracking(true);
     setFocus();
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Console setup
-    ////////////////////////////////////////////////////////////////////////////
-
-    m_console.setPrompt("$ ");
-
-    m_console.setStyleSheet("background-color: rgba(0, 0, 0, 128);");
-
-    QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    font.setPixelSize(16);
-    m_console.setFont(font);
-
-    m_console.setProcessor(std::bind(
-        &gcp::GenericCommandProcessor::process,
-        &m_processor,
-        std::placeholders::_1));
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Key bindings
-    ////////////////////////////////////////////////////////////////////////////
+    m_console.setParent(this);
 
     bind("space", [&]() { m_processor.process("toggle_run"); });
     bind("backspace", [&]() { m_processor.process("reset"); });
@@ -71,8 +55,6 @@ View::View(gcp::GenericCommandProcessor &processor, Controller &controller)
     bind("r", [&]() { m_processor.process("rev"); });
     bind("d", [&]() { m_processor.process("det"); });
     bind("m", [&]() { m_processor.process("min"); });
-
-    ////////////////////////////////////////////////////////////////////////////
 
     startTimer(16);
 }
@@ -183,11 +165,6 @@ void View::deselect()
     m_selected_object = nullptr;
 }
 
-qconsole::QConsole &View::getConsole()
-{
-    return m_console;
-}
-
 void View::toggleFullscreen()
 {
     isFullScreen() ? showNormal() : showFullScreen();
@@ -226,8 +203,39 @@ void View::edit()
     if (transition)
     {
         m_editing = true;
-        transition->setSymbol(-1); ///@ refactor
+        transition->startEditing();
     }
+}
+
+bool View::isConsoleVisible() const
+{
+    return m_console_visible;
+}
+
+void View::toggleConsole()
+{
+    QPropertyAnimation *animation =
+        new QPropertyAnimation(&m_console, "geometry");
+    connect(
+        animation, &QPropertyAnimation::finished, this, &View::resizeConsole);
+    animation->setEasingCurve(QEasingCurve::InOutSine);
+    animation->setDuration(200);
+    animation->setStartValue(m_console.rect());
+
+    if (m_console_visible)
+    {
+        animation->setEndValue(QRect(0, 0, width(), 0));
+        m_console.clearFocus();
+    }
+    else
+    {
+        animation->setEndValue(QRect(0, 0, width(), height() / 3));
+        m_console.setFocus();
+    }
+
+    animation->start();
+
+    m_console_visible = !m_console_visible;
 }
 
 void View::timerEvent(QTimerEvent *)
@@ -547,32 +555,6 @@ void View::tick()
     }
 
     m_time = Clock::now();
-}
-
-void View::toggleConsole()
-{
-    QPropertyAnimation *animation =
-        new QPropertyAnimation(&m_console, "geometry");
-    connect(
-        animation, &QPropertyAnimation::finished, this, &View::resizeConsole);
-    animation->setEasingCurve(QEasingCurve::InOutSine);
-    animation->setDuration(200);
-    animation->setStartValue(m_console.rect());
-
-    if (m_console_visible)
-    {
-        animation->setEndValue(QRect(0, 0, width(), 0));
-        m_console.clearFocus();
-    }
-    else
-    {
-        animation->setEndValue(QRect(0, 0, width(), height() / 3));
-        m_console.setFocus();
-    }
-
-    animation->start();
-
-    m_console_visible = !m_console_visible;
 }
 
 void View::resizeConsole()

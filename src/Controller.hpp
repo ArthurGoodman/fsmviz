@@ -3,6 +3,7 @@
 #include <vector>
 #include <QtCore/QObject>
 #include "GraphicsObject.hpp"
+#include "fsm/fsm.hpp"
 #include "gcp/GenericCommandProcessor.hpp"
 #include "qconsole/QConsole.hpp"
 
@@ -15,9 +16,10 @@ class Controller final : public QObject
     Q_OBJECT
 
 public: // methods
-    explicit Controller(gcp::GenericCommandProcessor &processor);
+    explicit Controller(
+        gcp::GenericCommandProcessor &processor,
+        qconsole::QConsole &console);
 
-    ///@todo Sort methods
     void setView(View *view);
 
     const std::vector<GraphicsObjectPtr> &getObjects() const;
@@ -44,12 +46,38 @@ private: // types
     };
 
 private: // methods
+    void setupCommands();
+
+    std::string getSaveFileName(const std::string &filter);
+
     void updateConnectedComponents();
 
-private: // fields
-    View *m_view;
+    void reset();
 
+    void deleteObject();
+    void toggleStarting();
+    void toggleFinal();
+
+    void clearConsole();
+    void printError(const std::string &message);
+
+    void setDefaultSymbol(const std::string &sym);
+
+    void printFsm(const fsm::Fsm &fsm);
+    fsm::Fsm createFsm();
+    void loadFsm(const fsm::Fsm &fsm);
+
+    void exportGraphviz();
+    void exportGraphviz(const std::string &file_name);
+
+    void renderImage();
+    void renderImage(const std::string &file_name);
+
+private: // fields
     gcp::GenericCommandProcessor &m_processor;
+    qconsole::QConsole &m_console;
+
+    View *m_view;
 
     std::vector<GraphicsObjectPtr> m_objects;
     std::vector<StateGraphicsObjectPtr> m_states;
@@ -57,6 +85,8 @@ private: // fields
 
     DefaultSymbol m_default_symbol;
     char m_default_letter;
+
+    bool m_command_from_key; ///@todo Refactor?
 };
 
 } // namespace fsmviz

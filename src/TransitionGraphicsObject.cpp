@@ -11,6 +11,7 @@ TransitionGraphicsObject::TransitionGraphicsObject(
     , m_start{start}
     , m_end{nullptr}
     , m_symbol{'\0'}
+    , m_editing{false}
 {
 }
 
@@ -98,7 +99,7 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
 
         QColor color = m_selected ? c_selected_color : c_default_color;
 
-        if (m_symbol < 0)
+        if (m_editing)
         {
             color = c_edit_color;
         }
@@ -106,7 +107,7 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
         p.fillPath(path, color);
         p.strokePath(path, pen);
 
-        if (m_symbol >= '\0' && m_end)
+        if (!m_editing && m_end)
         {
             p.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
 
@@ -120,7 +121,7 @@ void TransitionGraphicsObject::render(QPainter &p, int pass)
             p.drawText(
                 QRect(m_pos.toPoint() - center, size),
                 Qt::AlignCenter,
-                QString(m_symbol ? sym : "\u03b5"));
+                QString(sym[0] ? sym : "\u03b5"));
         }
     }
 } // namespace fsmviz
@@ -139,6 +140,7 @@ void TransitionGraphicsObject::setEnd(StateGraphicsObjectPtr end)
 void TransitionGraphicsObject::setSymbol(char symbol)
 {
     m_symbol = symbol;
+    m_editing = false;
 }
 
 StateGraphicsObjectPtr TransitionGraphicsObject::getStart() const
@@ -154,6 +156,11 @@ StateGraphicsObjectPtr TransitionGraphicsObject::getEnd() const
 char TransitionGraphicsObject::getSymbol() const
 {
     return m_symbol;
+}
+
+void TransitionGraphicsObject::startEditing()
+{
+    m_editing = true;
 }
 
 void TransitionGraphicsObject::drawArrow(

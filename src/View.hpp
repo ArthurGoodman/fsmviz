@@ -20,7 +20,9 @@ class View : public QWidget
 public: // methods
     explicit View(
         gcp::GenericCommandProcessor &processor,
+        qconsole::QConsole &console,
         Controller &controller);
+
     virtual ~View();
 
     void bind(std::string str, const std::function<void()> &handler);
@@ -28,13 +30,10 @@ public: // methods
 
     void renderImage(const std::string &file_name);
 
-    ///@todo Reoreder methods
     GraphicsObjectPtr getSelectedObject() const;
     void deselect();
 
     void disableShortcuts();
-
-    qconsole::QConsole &getConsole();
 
     void toggleFullscreen();
     void toggleAntialiasing();
@@ -46,6 +45,9 @@ public: // methods
     void reset();
 
     void edit();
+
+    bool isConsoleVisible() const;
+    void toggleConsole();
 
 protected: // methods
     void timerEvent(QTimerEvent *e) override;
@@ -70,13 +72,12 @@ private: // methods
     void applyForces();
     void tick();
 
-    void toggleConsole();
-
 private slots:
     void resizeConsole();
 
 private: // fields
     gcp::GenericCommandProcessor &m_processor;
+    qconsole::QConsole &m_console;
     Controller &m_controller;
 
     GraphicsObjectPtr m_selected_object;
@@ -92,7 +93,6 @@ private: // fields
 
     TimePoint m_time;
 
-    qconsole::QConsole m_console;
     bool m_console_visible;
 
     std::map<QKeySequence, std::pair<QAction *, QMetaObject::Connection>>

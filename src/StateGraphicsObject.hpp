@@ -28,6 +28,9 @@ public: // methods
     bool getFlag() const;
     void setFlag(bool flag);
 
+    std::size_t getId() const;
+    void setId(std::size_t id);
+
 private: // fields
     std::vector<TransitionGraphicsObjectPtr> m_transitions;
 
