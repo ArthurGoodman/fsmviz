@@ -6,6 +6,7 @@
 #include "StateGraphicsObject.hpp"
 #include "TransitionGraphicsObject.hpp"
 #include "View.hpp"
+#include "fsm/Regex.hpp"
 
 namespace fsmviz {
 
@@ -14,7 +15,7 @@ Controller::Controller(
     qconsole::QConsole &console)
     : m_processor{processor}
     , m_console{console}
-    , m_view{nullptr}
+    , m_view{nullptr} ///@todo Make Controller independent of Gui
     , m_default_symbol{DefaultSymbol::Epsilon}
     , m_default_letter{'\0'}
     , m_command_from_key{false}
@@ -177,6 +178,7 @@ StateGraphicsObjectPtr Controller::stateAt(const QVector2D &pos) const
 void Controller::setupCommands()
 {
     ///@todo Implement batch processing
+    ///@todo Split commands into Gui/Non-Gui and move them out of Controller
 
     m_processor.registerErrorCallback(
         [&](const std::string &message) { print("error: " + message); });
@@ -252,6 +254,11 @@ void Controller::setupCommands()
     m_processor.registerCommand("open", [&]() { open(); });
     m_processor.registerCommand(
         "open", [&](const std::string &file_name) { open(file_name); });
+
+    m_processor.registerCommand("regex", [&](const std::string &pattern) {
+        reset();
+        loadFsm(fsm::Regex::buildFsm(pattern));
+    });
 }
 
 std::string Controller::getSaveFileName(const std::string &filter)
@@ -276,9 +283,7 @@ void visitState(StateGraphicsObjectPtr state, int tag)
     state->setFlag(true);
     state->setTag(tag);
 
-    auto transitions = state->getTransitions();
-
-    for (TransitionGraphicsObjectPtr transition : transitions)
+    for (TransitionGraphicsObjectPtr transition : state->getTransitions())
     {
         transition->setTag(tag);
 
@@ -469,7 +474,7 @@ void Controller::printFsm(const fsm::Fsm &fsm)
 {
     std::stringstream stream;
     stream << fsm;
-    m_console << stream.str();
+    print(stream.str());
 }
 
 fsm::Fsm Controller::buildFsm()
