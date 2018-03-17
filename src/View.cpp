@@ -24,7 +24,7 @@ View::View(
     , m_moving{false}
     , m_run{false}
     , m_antialias{true}
-    , m_scale{1}
+    , m_scale{1} ///@todo Implement better scaling
     , m_time{Clock::now()}
     , m_console_visible{false}
     , m_editing{false}
@@ -66,6 +66,7 @@ View::~View()
 void View::bind(std::string str, const std::function<void()> &handler)
 {
     ///@todo Add more keys (and key sequences)
+
     static const std::vector<std::string> c_special_keys{
         "f1",     "f2",  "f3",        "f4",     "f5",    "f6",   "f7",
         "f8",     "f9",  "f10",       "f11",    "f12",   "home", "pgup",
@@ -87,11 +88,12 @@ void View::bind(std::string str, const std::function<void()> &handler)
 
     QAction *action;
 
-    if (m_actions.find(key_sequence) != m_actions.end())
+    const auto &it = m_actions.find(key_sequence);
+    if (it != m_actions.end())
     {
-        action = m_actions[key_sequence].first;
+        action = it->second.first;
         action->setText(str.c_str());
-        QObject::disconnect(m_actions[key_sequence].second);
+        QObject::disconnect(it->second.second);
     }
     else
     {
@@ -103,11 +105,7 @@ void View::bind(std::string str, const std::function<void()> &handler)
 
     QMetaObject::Connection connection =
         QObject::connect(action, &QAction::triggered, [=]() {
-            if (!m_editing)
-            {
-                handler();
-            }
-            else
+            if (m_editing)
             {
                 QCoreApplication::postEvent(
                     this,
@@ -116,6 +114,10 @@ void View::bind(std::string str, const std::function<void()> &handler)
                         action->shortcut()[0],
                         Qt::NoModifier,
                         action->shortcut().toString().toLower()));
+            }
+            else
+            {
+                handler();
             }
         });
 
@@ -152,7 +154,10 @@ void View::renderImage(const std::string &file_name)
         image.rect().center() - ((m_min + m_max) / 2).toPointF();
     render(p, image.rect(), translation);
 
-    image.save(file_name.c_str());
+    if (!image.save(file_name.c_str()))
+    {
+        image.save((file_name + ".png").c_str());
+    }
 }
 
 GraphicsObjectPtr View::getSelectedObject() const
@@ -193,6 +198,7 @@ void View::stop()
 void View::reset()
 {
     m_translation = QPointF();
+    ///@todo Decide what to do with this
     // m_scale = 1;
 }
 
@@ -236,6 +242,26 @@ void View::toggleConsole()
     animation->start();
 
     m_console_visible = !m_console_visible;
+}
+
+QPointF View::getTranslation() const
+{
+    return m_translation;
+}
+
+void View::setTranslation(const QPointF &translation)
+{
+    m_translation = translation;
+}
+
+float View::getScale() const
+{
+    return m_scale;
+}
+
+void View::setScale(float scale)
+{
+    m_scale = scale;
 }
 
 void View::timerEvent(QTimerEvent *)
@@ -301,7 +327,8 @@ void View::mousePressEvent(QMouseEvent *e)
         }
         else
         {
-            m_selected_object = m_controller.createState(pos);
+            m_selected_object =
+                m_controller.createState(pos, m_controller.getStates().empty());
             m_selected_object->select();
         }
     }
@@ -378,7 +405,7 @@ void View::keyPressEvent(QKeyEvent *e)
     TransitionGraphicsObjectPtr transition =
         cast<TransitionGraphicsObject>(m_selected_object);
 
-    if (m_editing)
+    if (m_editing && e->modifiers() == Qt::NoModifier)
     {
         if ((e->key() >= Qt::Key_A && e->key() <= Qt::Key_Z) ||
             (e->key() >= Qt::Key_0 && e->key() <= Qt::Key_9) ||
@@ -403,7 +430,7 @@ void View::keyPressEvent(QKeyEvent *e)
         if (m_editing)
         {
             m_editing = false;
-            transition->setSymbol('\0');
+            transition->finishEditing();
         }
         else
         {
@@ -495,6 +522,8 @@ void View::interact(GraphicsObjectPtr a, GraphicsObjectPtr b, bool attract)
 
 void View::applyForces()
 {
+    ///@todo Tweak interaction
+
     if (!m_run)
     {
         return;

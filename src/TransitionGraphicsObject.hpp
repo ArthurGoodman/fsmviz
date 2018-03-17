@@ -23,6 +23,7 @@ public: // methods
     char getSymbol() const;
 
     void startEditing();
+    void finishEditing();
 
 private: // methods
     void drawArrow(QPainter &p, const QVector2D &pos, QVector2D dir);

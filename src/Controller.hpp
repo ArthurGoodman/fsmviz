@@ -3,7 +3,7 @@
 #include <vector>
 #include <QtCore/QObject>
 #include "GraphicsObject.hpp"
-#include "fsm/fsm.hpp"
+#include "fsm/Fsm.hpp"
 #include "gcp/GenericCommandProcessor.hpp"
 #include "qconsole/QConsole.hpp"
 
@@ -23,16 +23,31 @@ public: // methods
     void setView(View *view);
 
     const std::vector<GraphicsObjectPtr> &getObjects() const;
+    const std::vector<StateGraphicsObjectPtr> &getStates() const;
+    const std::vector<TransitionGraphicsObjectPtr> &getTransitions() const;
 
-    StateGraphicsObjectPtr createState(const QVector2D &pos);
+    StateGraphicsObjectPtr createState(
+        const QVector2D &pos,
+        bool is_starting = false,
+        bool is_final = false,
+        bool update_connected_components = true);
 
     TransitionGraphicsObjectPtr createTransition(
-        StateGraphicsObjectPtr state,
-        const QVector2D &pos);
+        StateGraphicsObjectPtr start,
+        const QVector2D &pos,
+        bool update_connected_components = true);
+
+    TransitionGraphicsObjectPtr createTransition(
+        StateGraphicsObjectPtr start,
+        StateGraphicsObjectPtr end,
+        char symbol,
+        const QVector2D &pos,
+        bool update_connected_components = true);
 
     void connectTransition(
         TransitionGraphicsObjectPtr transition,
-        StateGraphicsObjectPtr end);
+        StateGraphicsObjectPtr end,
+        bool update_connected_components = true);
 
     GraphicsObjectPtr objectAt(const QVector2D &pos) const;
     StateGraphicsObjectPtr stateAt(const QVector2D &pos) const;
@@ -49,6 +64,7 @@ private: // methods
     void setupCommands();
 
     std::string getSaveFileName(const std::string &filter);
+    std::string getOpenFileName(const std::string &filter);
 
     void updateConnectedComponents();
 
@@ -59,12 +75,12 @@ private: // methods
     void toggleFinal();
 
     void clearConsole();
-    void printError(const std::string &message);
+    void print(const std::string &message);
 
     void setDefaultSymbol(const std::string &sym);
 
     void printFsm(const fsm::Fsm &fsm);
-    fsm::Fsm createFsm();
+    fsm::Fsm buildFsm();
     void loadFsm(const fsm::Fsm &fsm);
 
     void exportGraphviz();
@@ -72,6 +88,12 @@ private: // methods
 
     void renderImage();
     void renderImage(const std::string &file_name);
+
+    void save();
+    void save(const std::string &file_name);
+
+    void open();
+    void open(const std::string &file_name);
 
 private: // fields
     gcp::GenericCommandProcessor &m_processor;

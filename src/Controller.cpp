@@ -1,4 +1,5 @@
 #include "Controller.hpp"
+#include <cstring>
 #include <fstream>
 #include <functional>
 #include <QtWidgets/QtWidgets>
@@ -31,25 +32,54 @@ const std::vector<GraphicsObjectPtr> &Controller::getObjects() const
     return m_objects;
 }
 
-StateGraphicsObjectPtr Controller::createState(const QVector2D &pos)
+const std::vector<StateGraphicsObjectPtr> &Controller::getStates() const
+{
+    return m_states;
+}
+
+const std::vector<TransitionGraphicsObjectPtr> &Controller::getTransitions()
+    const
+{
+    return m_transitions;
+}
+
+StateGraphicsObjectPtr Controller::createState(
+    const QVector2D &pos,
+    bool is_starting,
+    bool is_final,
+    bool update_connected_components)
 {
     StateGraphicsObjectPtr state{new StateGraphicsObject(pos, m_states.size())};
     m_objects.emplace_back(state);
     m_states.emplace_back(state);
 
-    updateConnectedComponents();
+    if (is_starting)
+    {
+        state->toggleStarting();
+    }
+
+    if (is_final)
+    {
+        state->toggleFinal();
+    }
+
+    if (update_connected_components)
+    {
+        updateConnectedComponents();
+    }
 
     return state;
 }
 
 TransitionGraphicsObjectPtr Controller::createTransition(
-    StateGraphicsObjectPtr state,
-    const QVector2D &pos)
+    StateGraphicsObjectPtr start,
+    const QVector2D &pos,
+    bool update_connected_components)
 {
     TransitionGraphicsObjectPtr transition{
-        new TransitionGraphicsObject(state, pos)};
+        new TransitionGraphicsObject(start, pos)};
 
-    state->connect(transition);
+    start->connect(transition);
 
     switch (m_default_symbol)
     {
@@ -68,19 +98,54 @@ TransitionGraphicsObjectPtr Controller::createTransition(
     m_objects.emplace_back(transition);
     m_transitions.emplace_back(transition);
 
-    updateConnectedComponents();
+    if (update_connected_components)
+    {
+        updateConnectedComponents();
+    }
+
+    return transition;
+}
+
+TransitionGraphicsObjectPtr Controller::createTransition(
+    StateGraphicsObjectPtr start,
+    StateGraphicsObjectPtr end,
+    char symbol,
+    const QVector2D &pos,
+    bool update_connected_components)
+{
+    TransitionGraphicsObjectPtr transition{
+        new TransitionGraphicsObject(start, QVector2D())};
+
+    transition->setEnd(end);
+    transition->setPos(pos);
+    transition->setSymbol(symbol);
+
+    start->connect(transition);
+    end->connect(transition);
+
+    m_objects.emplace_back(transition);
+    m_transitions.emplace_back(transition);
+
+    if (update_connected_components)
+    {
+        updateConnectedComponents();
+    }
 
     return transition;
 }
 
 void Controller::connectTransition(
     TransitionGraphicsObjectPtr transition,
-    StateGraphicsObjectPtr end)
+    StateGraphicsObjectPtr end,
+    bool update_connected_components)
 {
     transition->setEnd(end);
     end->connect(transition);
 
-    updateConnectedComponents();
+    if (update_connected_components)
+    {
+        updateConnectedComponents();
+    }
 }
 
 GraphicsObjectPtr Controller::objectAt(const QVector2D &pos) const
@@ -111,8 +176,10 @@ StateGraphicsObjectPtr Controller::stateAt(const QVector2D &pos) const
 
 void Controller::setupCommands()
 {
+    ///@todo Implement batch processing
+
     m_processor.registerErrorCallback(
-        std::bind(&Controller::printError, this, std::placeholders::_1));
+        [&](const std::string &message) { print("error: " + message); });
 
     m_processor.registerCommand("quit", [&]() { m_view->close(); });
     m_processor.registerCommand("exit", [&]() { m_view->close(); });
@@ -159,11 +226,11 @@ void Controller::setupCommands()
     m_processor.registerCommand(
         "symbol", [&](const std::string &sym) { setDefaultSymbol(sym); });
 
-    m_processor.registerCommand("print", [&]() { printFsm(createFsm()); });
+    m_processor.registerCommand("print", [&]() { printFsm(buildFsm()); });
 
-    m_processor.registerCommand("rev", [&]() { loadFsm(createFsm().rev()); });
-    m_processor.registerCommand("det", [&]() { loadFsm(createFsm().det()); });
-    m_processor.registerCommand("min", [&]() { loadFsm(createFsm().min()); });
+    m_processor.registerCommand("rev", [&]() { loadFsm(buildFsm().rev()); });
+    m_processor.registerCommand("det", [&]() { loadFsm(buildFsm().det()); });
+    m_processor.registerCommand("min", [&]() { loadFsm(buildFsm().min()); });
 
     m_processor.registerCommand("export", [&]() { exportGraphviz(); });
     m_processor.registerCommand("export", [&](const std::string &file_name) {
@@ -174,6 +241,17 @@ void Controller::setupCommands()
     m_processor.registerCommand("render", [&](const std::string &file_name) {
         renderImage(file_name);
     });
+
+    m_processor.registerCommand(
+        "echo", [&](const std::string &str) { print(str); });
+
+    m_processor.registerCommand("save", [&]() { save(); });
+    m_processor.registerCommand(
+        "save", [&](const std::string &file_name) { save(file_name); });
+
+    m_processor.registerCommand("open", [&]() { open(); });
+    m_processor.registerCommand(
+        "open", [&](const std::string &file_name) { open(file_name); });
 }
 
 std::string Controller::getSaveFileName(const std::string &filter)
@@ -182,42 +260,47 @@ std::string Controller::getSaveFileName(const std::string &filter)
         .toStdString();
 }
 
+std::string Controller::getOpenFileName(const std::string &filter)
+{
+    return QFileDialog::getOpenFileName(m_view, "", "", filter.c_str())
+        .toStdString();
+}
+
+void visitState(StateGraphicsObjectPtr state, int tag)
+{
+    if (state->getFlag())
+    {
+        return;
+    }
+
+    state->setFlag(true);
+    state->setTag(tag);
+
+    auto transitions = state->getTransitions();
+
+    for (TransitionGraphicsObjectPtr transition : transitions)
+    {
+        transition->setTag(tag);
+
+        if (transition->getStart() != state)
+        {
+            visitState(transition->getStart(), tag);
+        }
+        else if (transition->getEnd())
+        {
+            visitState(transition->getEnd(), tag);
+        }
+    }
+}
+
 void Controller::updateConnectedComponents()
 {
-    std::function<void(StateGraphicsObjectPtr, int)> visitState =
-        [&](StateGraphicsObjectPtr state, int tag) {
-            if (state->getFlag())
-            {
-                return;
-            }
-
-            state->setFlag(true);
-            state->setTag(tag);
-
-            auto transitions = state->getTransitions();
-
-            for (TransitionGraphicsObjectPtr transition : transitions)
-            {
-                transition->setTag(tag);
-
-                if (transition->getStart() != state)
-                {
-                    visitState(transition->getStart(), tag);
-                }
-                else if (transition->getEnd())
-                {
-                    visitState(transition->getEnd(), tag);
-                }
-            }
-        };
-
     for (StateGraphicsObjectPtr state : m_states)
     {
         state->setFlag(false);
     }
 
     int tag = 0;
-
     for (StateGraphicsObjectPtr state : m_states)
     {
         visitState(state, tag++);
@@ -341,7 +424,7 @@ void Controller::clearConsole()
     }
 }
 
-void Controller::printError(const std::string &message)
+void Controller::print(const std::string &message)
 {
     if (!m_view->isConsoleVisible())
     {
@@ -350,11 +433,10 @@ void Controller::printError(const std::string &message)
 
     if (m_command_from_key)
     {
-        m_console.removeBlock();
-        m_console.insertBlock();
+        m_console.eraseBlock();
     }
 
-    m_console << "error: " << message << "\n";
+    m_console << message << "\n";
 
     if (m_command_from_key)
     {
@@ -379,7 +461,7 @@ void Controller::setDefaultSymbol(const std::string &sym)
     }
     else
     {
-        printError("invalid symbol");
+        print("error: invalid symbol");
     }
 }
 
@@ -390,7 +472,7 @@ void Controller::printFsm(const fsm::Fsm &fsm)
     m_console << stream.str();
 }
 
-fsm::Fsm Controller::createFsm()
+fsm::Fsm Controller::buildFsm()
 {
     fsm::Fsm fsm(m_states.size());
 
@@ -481,7 +563,8 @@ void Controller::loadFsm(const fsm::Fsm &fsm)
 
 void Controller::exportGraphviz()
 {
-    std::string file_name = getSaveFileName("Graphviz files (*.gv)");
+    std::string file_name =
+        getSaveFileName("Graphviz files (*.gv);;All files (*)");
     if (!file_name.empty())
     {
         exportGraphviz(file_name);
@@ -492,15 +575,22 @@ void Controller::exportGraphviz(const std::string &file_name)
 {
     if (file_name.empty())
     {
-        printError("empty file name");
+        print("error: empty file name");
         return;
     }
 
-    std::ofstream f(file_name);
+    std::ofstream file(file_name);
 
-    f << "digraph fsm {" << std::endl;
-    f << "rankdir=LR;" << std::endl;
-    f << "node[shape=doublecircle];" << std::endl;
+    if (!file)
+    {
+        print("error: couldn't open file");
+        return;
+    }
+
+    file << "digraph fsm {" << std::endl;
+    file << "rankdir=LR;" << std::endl;
+
+    file << "node[shape=doublecircle];" << std::endl;
 
     std::map<StateGraphicsObjectPtr, std::size_t> state_indices;
 
@@ -509,43 +599,221 @@ void Controller::exportGraphviz(const std::string &file_name)
     {
         if (s->isFinal())
         {
-            f << "\"" << i << "\";" << std::endl;
+            file << "\"" << i << "\";" << std::endl;
         }
 
         state_indices[s] = i++;
     }
 
-    f << "node[shape=circle];" << std::endl;
+    file << "node[shape=circle];" << std::endl;
 
     for (TransitionGraphicsObjectPtr t : m_transitions)
     {
         char sym[] = {t->getSymbol(), '\0'};
-        f << "\"" << state_indices[t->getStart()] << "\"->\""
-          << state_indices[t->getEnd()] << "\"[label=\""
-          << (sym[0] ? sym : "\u03b5") << "\"];" << std::endl;
+        file << "\"" << state_indices[t->getStart()] << "\"->\""
+             << state_indices[t->getEnd()] << "\"[label=\""
+             << (sym[0] ? sym : "\u03b5") << "\"];" << std::endl;
     }
 
-    f << "}" << std::endl;
+    file << "}" << std::endl;
 }
 
 void Controller::renderImage()
 {
-    std::string file_name = getSaveFileName("Images (*.bmp *.jpg *.png)");
+    std::string file_name =
+        getSaveFileName("Images (*.bmp *.jpg *.png);;All files (*)");
     if (!file_name.empty())
     {
+        renderImage(file_name);
     }
-    m_view->renderImage(file_name);
 }
 
 void Controller::renderImage(const std::string &file_name)
 {
     if (file_name.empty())
     {
-        printError("empty file name");
+        print("error: empty file name");
         return;
     }
 
     m_view->renderImage(file_name);
+}
+
+void Controller::save()
+{
+    std::string file_name = getSaveFileName("Fsm files (*.fsm);;All files (*)");
+    if (!file_name.empty())
+    {
+        save(file_name);
+    }
+}
+
+template <class T>
+void write(std::ostream &stream, const T &value)
+{
+    stream.write(reinterpret_cast<const char *>(&value), sizeof(T));
+}
+
+template <class T>
+void read(std::istream &stream, T &value)
+{
+    stream.read(reinterpret_cast<char *>(&value), sizeof(T));
+}
+
+#pragma pack(push, 1)
+struct FsmHeader
+{
+    char magic_number[3];
+    std::uint64_t states;
+    std::uint64_t transitions;
+    float x_offset;
+    float y_offset;
+    float scale;
+};
+
+struct StateRecord
+{
+    std::uint64_t id;
+    char is_starting;
+    char is_final;
+    float x;
+    float y;
+};
+
+struct TransitionRecord
+{
+    std::uint64_t start;
+    std::uint64_t end;
+    char symbol;
+    float x;
+    float y;
+};
+#pragma pack(pop)
+
+void Controller::save(const std::string &file_name)
+{
+    if (file_name.empty())
+    {
+        print("error: empty file name");
+        return;
+    }
+
+    std::ofstream file(file_name, std::ios::binary);
+
+    if (!file)
+    {
+        print("error: couldn't open file");
+        return;
+    }
+
+    QPointF translation = m_view->getTranslation();
+    float scale = m_view->getScale();
+
+    FsmHeader header;
+
+    std::memcpy(header.magic_number, "FSM", 3);
+    header.states = m_states.size();
+    header.transitions = m_transitions.size();
+    header.x_offset = translation.x();
+    header.y_offset = translation.y();
+    header.scale = scale;
+
+    write(file, header);
+
+    std::map<StateGraphicsObjectPtr, std::size_t> state_indices;
+
+    std::size_t i = 0;
+    for (StateGraphicsObjectPtr s : m_states)
+    {
+        StateRecord rec;
+
+        rec.id = i;
+        rec.is_starting = s->isStarting();
+        rec.is_final = s->isFinal();
+        rec.x = s->getPos().x();
+        rec.y = s->getPos().y();
+
+        write(file, rec);
+
+        state_indices[s] = i++;
+    }
+
+    for (TransitionGraphicsObjectPtr t : m_transitions)
+    {
+        TransitionRecord rec;
+
+        rec.start = state_indices[t->getStart()];
+        rec.end = state_indices[t->getEnd()];
+        rec.symbol = t->getSymbol();
+        rec.x = t->getPos().x();
+        rec.y = t->getPos().y();
+
+        write(file, rec);
+    }
+}
+
+void Controller::open()
+{
+    std::string file_name = getOpenFileName("Fsm files (*.fsm);;All files (*)");
+    if (!file_name.empty())
+    {
+        open(file_name);
+    }
+}
+
+void Controller::open(const std::string &file_name)
+{
+    if (file_name.empty())
+    {
+        print("error: empty file name");
+        return;
+    }
+
+    std::ifstream file(file_name, std::ios::binary);
+
+    if (!file)
+    {
+        print("error: couldn't open file");
+        return;
+    }
+
+    reset();
+
+    FsmHeader header;
+    read(file, header);
+
+    if (std::strncmp(header.magic_number, "FSM", 3))
+    {
+        print("error: file corrupted");
+        return;
+    }
+
+    m_view->setTranslation(QPointF(header.x_offset, header.y_offset));
+    m_view->setScale(header.scale);
+
+    for (std::size_t i = 0; i < header.states; i++)
+    {
+        StateRecord rec;
+        read(file, rec);
+
+        createState(
+            QVector2D(rec.x, rec.y), rec.is_starting, rec.is_final, false);
+    }
+
+    for (std::size_t i = 0; i < header.transitions; i++)
+    {
+        TransitionRecord rec;
+        read(file, rec);
+
+        createTransition(
+            m_states[rec.start],
+            m_states[rec.end],
+            rec.symbol,
+            QVector2D(rec.x, rec.y),
+            false);
+    }
+
+    updateConnectedComponents();
 }
 
 } // namespace fsmviz

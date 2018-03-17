@@ -49,6 +49,12 @@ public: // methods
     bool isConsoleVisible() const;
     void toggleConsole();
 
+    QPointF getTranslation() const;
+    void setTranslation(const QPointF &translation);
+
+    float getScale() const;
+    void setScale(float scale);
+
 protected: // methods
     void timerEvent(QTimerEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;

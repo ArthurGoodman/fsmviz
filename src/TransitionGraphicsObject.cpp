@@ -163,6 +163,11 @@ void TransitionGraphicsObject::startEditing()
     m_editing = true;
 }
 
+void TransitionGraphicsObject::finishEditing()
+{
+    m_editing = false;
+}
+
 void TransitionGraphicsObject::drawArrow(
     QPainter &p,
     const QVector2D &pos,
