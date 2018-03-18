@@ -255,9 +255,16 @@ void Controller::setupCommands()
     m_processor.registerCommand(
         "open", [&](const std::string &file_name) { open(file_name); });
 
-    m_processor.registerCommand("regex", [&](const std::string &pattern) {
-        reset();
-        loadFsm(fsm::Regex::buildFsm(pattern));
+    m_processor.registerCommand("re", [&](const std::string &pattern) {
+        try
+        {
+            reset();
+            loadFsm(fsm::Regex::buildFsm(pattern));
+        }
+        catch (const std::exception &e)
+        {
+            print("error: " + std::string(e.what()));
+        }
     });
 }
 
@@ -576,6 +583,7 @@ void Controller::exportGraphviz()
     }
 }
 
+///@todo Fix exporting for transition on characters that need to be escaped
 void Controller::exportGraphviz(const std::string &file_name)
 {
     if (file_name.empty())
@@ -592,7 +600,7 @@ void Controller::exportGraphviz(const std::string &file_name)
         return;
     }
 
-    file << "digraph fsm {" << std::endl;
+    file << "digraph FSM {" << std::endl;
     file << "rankdir=LR;" << std::endl;
 
     file << "node[shape=doublecircle];" << std::endl;
@@ -646,7 +654,7 @@ void Controller::renderImage(const std::string &file_name)
 
 void Controller::save()
 {
-    std::string file_name = getSaveFileName("Fsm files (*.fsm);;All files (*)");
+    std::string file_name = getSaveFileName("FSM files (*.fsm);;All files (*)");
     if (!file_name.empty())
     {
         save(file_name);
@@ -759,7 +767,7 @@ void Controller::save(const std::string &file_name)
 
 void Controller::open()
 {
-    std::string file_name = getOpenFileName("Fsm files (*.fsm);;All files (*)");
+    std::string file_name = getOpenFileName("FSM files (*.fsm);;All files (*)");
     if (!file_name.empty())
     {
         open(file_name);
