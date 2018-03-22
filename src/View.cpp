@@ -22,7 +22,7 @@ View::View(
     , m_selected_object{nullptr}
     , m_translating{false}
     , m_moving{false}
-    , m_run{false}
+    , m_run{true}
     , m_antialias{true}
     , m_scale{1} ///@todo Implement better scaling
     , m_time{Clock::now()}
