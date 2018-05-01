@@ -4,7 +4,7 @@ file(GLOB_RECURSE FSMVIZ_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
 set(CMAKE_AUTOMOC true)
 set(CMAKE_INCLUDE_CURRENT_DIR true)
 
-qt5_wrap_cpp(${FSMVIZ_HEADERS})
+qt5_wrap_cpp(${FSMVIZ_SOURCES})
 
 add_executable(${FSMVIZ}
     ${FSMVIZ_SOURCES}
