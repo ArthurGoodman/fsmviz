@@ -1,6 +1,0 @@
-[submodule "fsm"]
-	path = fsm
-	url = https://github.com/ArthurGoodman/fsm.git
-[submodule "qconsole"]
-	path = qconsole
-	url = https://github.com/ArthurGoodman/qconsole.git
