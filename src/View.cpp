@@ -92,12 +92,11 @@ void View::bind(std::string str, const std::function<void()> &handler)
     if (it != m_actions.end())
     {
         action = it->second.first;
-        action->setText(str.c_str());
         QObject::disconnect(it->second.second);
     }
     else
     {
-        action = new QAction(str.c_str(), this);
+        action = new QAction(this);
         addAction(action);
     }
 
@@ -432,10 +431,17 @@ void View::keyPressEvent(QKeyEvent *e)
             m_editing = false;
             transition->finishEditing();
         }
+        else if (m_console_visible)
+        {
+            toggleConsole();
+        }
+        else if (isFullScreen())
+        {
+            showNormal();
+        }
         else
         {
-            m_console_visible ? toggleConsole()
-                              : isFullScreen() ? showNormal() : qApp->quit();
+            qApp->quit();
         }
         break;
 
@@ -572,9 +578,11 @@ void View::tick()
         m_max = QVector2D(-float_max, -float_max);
     }
 
+    float dt = Duration(Clock::now() - m_time).count();
+
     for (GraphicsObjectPtr obj : m_controller.getObjects())
     {
-        obj->tick(Duration(Clock::now() - m_time).count());
+        obj->tick(dt);
 
         QVector2D pos = obj->getPos();
         m_min = QVector2D(
