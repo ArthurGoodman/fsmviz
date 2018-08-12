@@ -14,8 +14,8 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib)
 ################################################################################
 
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED true)
-set(CMAKE_CXX_EXTENSIONS false)
+set(CMAKE_CXX_STANDARD_REQUIRED on)
+set(CMAKE_CXX_EXTENSIONS off)
 
 set(FLAGS "-Wall -Wextra -Wunused-variable -Wno-comment")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}")
@@ -25,9 +25,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}")
 ################################################################################
 
 # Qt5
-find_package(Qt5 COMPONENTS
+find_package(Qt5 REQUIRED COMPONENTS
     Widgets
-    REQUIRED)
+    )
 
 ################################################################################
 # Targets
